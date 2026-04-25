@@ -1,0 +1,29 @@
+[[leagues]]
+slug = "uefa.champions"
+name = "UCL"
+full_name = "UEFA Champions League"
+
+[[leagues]]
+slug = "uefa.europa"
+name = "UEL"
+full_name = "UEFA Europa League"
+
+[[leagues]]
+slug = "eng.1"
+name = "EPL"
+full_name = "English Premier League"
+
+[[leagues]]
+slug = "esp.1"
+name = "La Liga"
+full_name = "La Liga"
+
+[[leagues]]
+slug = "fifa.world"
+name = "FIFA WC"
+full_name = "FIFA World Cup"
+
+[[leagues]]
+slug = "mex.1"
+name = "Liga MX"
+full_name = "Liga MX"
