@@ -30,6 +30,7 @@ packages = ["src/tapu"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+pythonpath = ["src"]
 
 [tool.ruff]
 target-version = "py313"
