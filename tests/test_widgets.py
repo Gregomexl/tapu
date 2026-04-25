@@ -1,7 +1,35 @@
 import pytest
 from textual.app import App, ComposeResult
+from tapu.config import League
+from tapu.widgets.league_card import LeagueCard
 from tapu.widgets.match_card import MatchCard
 from tapu.widgets.standings import StandingsTable
+
+
+class _LeagueCardTestApp(App):
+    def __init__(self, league: League, scoreboard: dict) -> None:
+        super().__init__()
+        self._league = league
+        self._scoreboard = scoreboard
+
+    def compose(self) -> ComposeResult:
+        yield LeagueCard(self._league, self._scoreboard)
+
+
+@pytest.mark.asyncio
+async def test_league_card_renders(sample_scoreboard):
+    league = League(slug="eng.1", name="EPL", full_name="English Premier League")
+    async with _LeagueCardTestApp(league, sample_scoreboard).run_test() as pilot:
+        card = pilot.app.query_one(LeagueCard)
+        assert card is not None
+
+
+@pytest.mark.asyncio
+async def test_league_card_live_count(sample_scoreboard):
+    league = League(slug="eng.1", name="EPL", full_name="English Premier League")
+    async with _LeagueCardTestApp(league, sample_scoreboard).run_test() as pilot:
+        card = pilot.app.query_one(LeagueCard)
+        assert card.live_count == 1
 
 
 class _StandingsTestApp(App):
