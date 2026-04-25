@@ -13,7 +13,8 @@ from tapu.widgets.match_detail import MatchDetail
 
 class MatchScreen(Screen):
     BINDINGS: ClassVar[list[BindingType]] = [
-        Binding("escape,b", "app.pop_screen", "Back"),
+        Binding("escape", "app.pop_screen", "Back"),
+        Binding("b", "app.pop_screen", "Back", show=False),
         Binding("r", "refresh", "Refresh"),
         Binding("?", "app.open_chat", "Chat"),
     ]

@@ -23,7 +23,7 @@ def _status_label(event: dict) -> str:
     return "[dim]Upcoming[/dim]"
 
 
-class MatchCard(Widget):
+class MatchCard(Widget, can_focus=True):
     BINDINGS: ClassVar[list[BindingType]] = [
         Binding("enter", "select", "View Match", show=False),
     ]

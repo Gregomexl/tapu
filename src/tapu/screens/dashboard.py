@@ -16,6 +16,8 @@ class DashboardScreen(Screen):
         Binding("r", "refresh", "Refresh"),
         Binding("q", "app.quit", "Quit"),
         Binding("?", "app.open_chat", "Chat"),
+        Binding("up,left", "focus_previous", "Prev", show=False),
+        Binding("down,right", "focus_next", "Next", show=False),
     ]
 
     DEFAULT_CSS = """
@@ -59,16 +61,21 @@ class DashboardScreen(Screen):
     async def _load_all(self) -> None:
         grid = self.query_one("#cards-grid", ItemGrid)
         await grid.remove_children()
+        first_card: LeagueCard | None = None
         for league in self.leagues:
             try:
                 sb = await self.client.get_scoreboard(league.slug)
                 self._scoreboards[league.slug] = sb
                 card = LeagueCard(league, sb)
                 await grid.mount(card)
+                if first_card is None:
+                    first_card = card
             except Exception:
                 await grid.mount(
                     Static(f"[red]{league.name}: unavailable[/red]")
                 )
+        if first_card is not None:
+            first_card.focus()
 
     async def _auto_refresh(self) -> None:
         self.run_worker(self._load_all(), exclusive=True)

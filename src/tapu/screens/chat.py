@@ -6,7 +6,8 @@ from textual.widgets import Footer, Header, Static
 
 class ChatScreen(Screen):
     BINDINGS: list[BindingType] = [
-        Binding("escape,b", "app.pop_screen", "Back", show=True),
+        Binding("escape", "app.pop_screen", "Back", show=True),
+        Binding("b", "app.pop_screen", "Back", show=False),
     ]
 
     DEFAULT_CSS = """

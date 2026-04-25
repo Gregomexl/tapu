@@ -14,9 +14,12 @@ from tapu.widgets.standings import StandingsTable
 
 class LeagueScreen(Screen):
     BINDINGS: ClassVar[list[BindingType]] = [
-        Binding("escape,b", "app.pop_screen", "Back"),
+        Binding("escape", "app.pop_screen", "Back"),
+        Binding("b", "app.pop_screen", "Back", show=False),
         Binding("r", "refresh", "Refresh"),
         Binding("?", "app.open_chat", "Chat"),
+        Binding("up", "focus_previous", "Prev", show=False),
+        Binding("down", "focus_next", "Next", show=False),
     ]
 
     DEFAULT_CSS = """
