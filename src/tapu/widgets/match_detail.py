@@ -115,13 +115,19 @@ class MatchDetail(Widget):
     }
     """
 
-    def __init__(self, event: dict[str, Any], summary: dict[str, Any]) -> None:
+    def __init__(
+        self,
+        event: dict[str, Any],
+        summary: dict[str, Any],
+        clock_base: float | None = None,
+        clock_mono: float | None = None,
+    ) -> None:
         super().__init__()
         self.event = event
         self.summary = summary
         self._is_live = event["status"]["type"].get("state") == "in"
-        self._base_clock = event["status"].get("clock", 0.0)
-        self._fetch_mono = time.monotonic()
+        self._base_clock = clock_base if clock_base is not None else event["status"].get("clock", 0.0)
+        self._fetch_mono = clock_mono if clock_mono is not None else time.monotonic()
 
     def compose(self) -> ComposeResult:
         competitors = self.event["competitions"][0]["competitors"]

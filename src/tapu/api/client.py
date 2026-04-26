@@ -30,14 +30,14 @@ class ESPNClient:
         return data
 
     async def get_scoreboard(self, slug: str) -> dict[str, Any]:
-        return await self._get(f"{BASE_URL}/{slug}/scoreboard", cache_ttl=10.0)
+        return await self._get(f"{BASE_URL}/{slug}/scoreboard", cache_ttl=5.0)
 
     async def get_standings(self, slug: str) -> dict[str, Any]:
         return await self._get(f"{STANDINGS_URL}/{slug}/standings")
 
     async def get_match_summary(self, slug: str, event_id: str) -> dict[str, Any]:
         return await self._get(
-            f"{BASE_URL}/{slug}/summary?event={event_id}", cache_ttl=10.0
+            f"{BASE_URL}/{slug}/summary?event={event_id}", cache_ttl=5.0
         )
 
     async def get_logo_bytes(self, url: str) -> bytes:

@@ -1,4 +1,6 @@
+import time
 from typing import Any, ClassVar
+
 from textual.app import ComposeResult
 from textual.binding import Binding, BindingType
 from textual.containers import VerticalScroll
@@ -45,6 +47,9 @@ class MatchScreen(Screen):
         self.event = event
         self._is_live = event["status"]["type"].get("state") == "in"
         self._refresh_timer: Timer | None = None
+        # Monotonic clock tracking — never goes backward
+        self._clock_base: float = event["status"].get("clock", 0.0)
+        self._clock_mono: float = time.monotonic()
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -58,7 +63,7 @@ class MatchScreen(Screen):
         self.sub_title = self.event.get("name", "Match")
         self.run_worker(self._load_summary(), exclusive=True)
         if self._is_live:
-            self._refresh_timer = self.set_interval(30, self._auto_refresh)
+            self._refresh_timer = self.set_interval(5, self._auto_refresh)
 
     async def _load_summary(self) -> None:
         scroll = self.query_one("#detail-scroll", VerticalScroll)
@@ -67,7 +72,9 @@ class MatchScreen(Screen):
             summary = await self.client.get_match_summary(
                 self.league.slug, self.event_id
             )
-            await scroll.mount(MatchDetail(self.event, summary))
+            await scroll.mount(
+                MatchDetail(self.event, summary, self._clock_base, self._clock_mono)
+            )
         except Exception:
             await scroll.mount(
                 Static("[red]Match details unavailable[/red]", classes="loading")
@@ -85,10 +92,18 @@ class MatchScreen(Screen):
                 self._is_live = updated["status"]["type"].get("state") == "in"
                 if not self._is_live and self._refresh_timer:
                     self._refresh_timer.stop()
+                # Only advance the clock — never go backward
+                new_clock = updated["status"].get("clock", 0.0)
+                current_estimate = self._clock_base + (time.monotonic() - self._clock_mono)
+                if new_clock > current_estimate:
+                    self._clock_base = new_clock
+                    self._clock_mono = time.monotonic()
             await self._load_summary()
         except Exception:
             pass
 
     def action_refresh(self) -> None:
         self.client.clear_cache()
+        self._clock_base = self.event["status"].get("clock", 0.0)
+        self._clock_mono = time.monotonic()
         self.run_worker(self._load_summary(), exclusive=True)
