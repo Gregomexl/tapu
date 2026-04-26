@@ -2,28 +2,34 @@
 slug = "uefa.champions"
 name = "UCL"
 full_name = "UEFA Champions League"
+color = "#1a56db"
 
 [[leagues]]
 slug = "uefa.europa"
 name = "UEL"
 full_name = "UEFA Europa League"
+color = "#f05a28"
 
 [[leagues]]
 slug = "eng.1"
 name = "EPL"
 full_name = "English Premier League"
+color = "#3d0068"
 
 [[leagues]]
 slug = "esp.1"
 name = "La Liga"
 full_name = "La Liga"
+color = "#ee8707"
 
 [[leagues]]
 slug = "fifa.world"
 name = "FIFA WC"
 full_name = "FIFA World Cup"
+color = "#c8a84b"
 
 [[leagues]]
 slug = "mex.1"
 name = "Liga MX"
 full_name = "Liga MX"
+color = "#006847"

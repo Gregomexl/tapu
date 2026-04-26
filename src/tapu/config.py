@@ -8,6 +8,7 @@ class League:
     slug: str
     name: str
     full_name: str
+    color: str = "#ffffff"
 
 
 def load_leagues(path: Path | None = None) -> list[League]:
