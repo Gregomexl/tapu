@@ -104,6 +104,10 @@ class MatchDetail(Widget):
     MatchDetail Horizontal {
         height: auto;
     }
+    MatchDetail .commentary {
+        color: $text-muted;
+        padding: 0 0 1 0;
+    }
     """
 
     def __init__(self, event: dict[str, Any], summary: dict[str, Any]) -> None:
@@ -146,6 +150,23 @@ class MatchDetail(Widget):
             local_time = _format_local_time(date_str) if date_str else status.get("detail", "Upcoming")
             status_text = f"[dim]{local_time}[/dim]"
         yield Static(status_text, id="status-clock", classes="status-line")
+
+        # Live commentary
+        if state == "in":
+            commentary = self.summary.get("commentary", [])
+            recent = [c for c in reversed(commentary) if c.get("text")][:5]
+            if recent:
+                lines = []
+                for c in recent:
+                    minute = c.get("time", {}).get("displayValue", "")
+                    text = c.get("text", "")
+                    prefix = f"[dim]{minute:>3}[/dim]  " if minute else "     "
+                    lines.append(f"{prefix}{text}")
+                yield Static(
+                    "[bold dim]── Live Updates " + "─" * 20 + "[/bold dim]",
+                    classes="section-label",
+                )
+                yield Static("\n".join(lines), id="commentary", classes="commentary")
 
         # Goals
         key_events = self.summary.get("keyEvents", [])
