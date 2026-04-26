@@ -111,6 +111,7 @@ class LeagueCard(Widget, can_focus=True):
             png_bytes = await client.get_logo_bytes(self._logo_url)
             rendered = await asyncio.to_thread(_render_logo_chafa, png_bytes)
             if rendered:
+                from rich.text import Text
                 logo_widget = self.query_one("#logo-line", Static)
                 events = self.scoreboard.get("events", [])
                 live_label = (
@@ -118,7 +119,10 @@ class LeagueCard(Widget, can_focus=True):
                     if self.live_count > 0
                     else f"[dim]{len(events)} matches[/dim]"
                 )
-                logo_widget.update(f"{rendered}  {live_label}")
+                logo_text = Text.from_ansi(rendered)
+                logo_text.append(f"  ")
+                logo_text.append_text(Text.from_markup(live_label))
+                logo_widget.update(logo_text)
         except Exception:
             pass
 
