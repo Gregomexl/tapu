@@ -173,6 +173,39 @@ class MatchDetail(Widget):
                 Static("\n".join(away_lines), classes="goals-away"),
             )
 
+        # Cards
+        cards = [k for k in key_events if "card" in k.get("type", {}).get("type", "")]
+        if cards:
+            home_cards: list[str] = []
+            away_cards: list[str] = []
+            for c in cards:
+                team_id = str(c.get("team", {}).get("id", ""))
+                clock_val = c.get("clock", {}).get("displayValue", "")
+                name = c.get("participants", [{}])[0].get("athlete", {}).get("displayName", "?")
+                card_type = c.get("type", {}).get("type", "")
+                if card_type == "yellow-card":
+                    icon = "[bold yellow]▪[/bold yellow]"
+                elif card_type == "red-card":
+                    icon = "[bold red]■[/bold red]"
+                else:
+                    icon = "[bold yellow]▪[/bold yellow][bold red]■[/bold red]"
+                line = f"{icon} [bold]{clock_val}[/bold]  {name}"
+                if team_id == home_id:
+                    home_cards.append(line)
+                else:
+                    away_cards.append(f"[bold]{clock_val}[/bold]  {name}  {icon}")
+
+            if home_cards or away_cards:
+                yield Static("🟨  Cards", classes="section-label")
+                rows = max(len(home_cards), len(away_cards), 1)
+                home_cards += [""] * (rows - len(home_cards))
+                away_cards += [""] * (rows - len(away_cards))
+                yield Horizontal(
+                    Static("\n".join(home_cards), classes="goals-home"),
+                    Static("│\n" * rows, classes="goals-sep"),
+                    Static("\n".join(away_cards), classes="goals-away"),
+                )
+
         # Stats with progress bars
         teams_data = self.summary.get("boxscore", {}).get("teams", [])
         if len(teams_data) >= 2:
