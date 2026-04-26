@@ -100,6 +100,11 @@ class MatchDetail(Widget):
     }
     MatchDetail .stat-row {
         height: 1;
+        text-align: center;
+    }
+    MatchDetail .stats-abbr {
+        text-align: center;
+        padding: 0 0 0 0;
     }
     MatchDetail Horizontal {
         height: auto;
@@ -240,9 +245,10 @@ class MatchDetail(Widget):
             h = {s["name"]: s["displayValue"] for s in home_td.get("statistics", [])}
             a = {s["name"]: s["displayValue"] for s in away_td.get("statistics", [])}
 
+            yield Static("📊  Stats", classes="section-label")
             yield Static(
-                f"📊  [bold]{home_abbr}[/bold]                         [bold]{away_abbr}[/bold]",
-                classes="section-label",
+                f"[bold]{home_abbr}[/bold]                                   [bold]{away_abbr}[/bold]",
+                classes="stats-abbr",
             )
 
             for key, label in STAT_KEYS:
@@ -251,7 +257,7 @@ class MatchDetail(Widget):
                     continue
                 home_bar, away_bar = _stat_bar(hv, av)
                 yield Static(
-                    f"  {home_bar} [bold]{hv:>5}[/bold]  [dim]{label:<12}[/dim]  [bold]{av:<5}[/bold] {away_bar}",
+                    f"{home_bar} [bold]{hv:>5}[/bold]  [dim]{label:<12}[/dim]  [bold]{av:<5}[/bold] {away_bar}",
                     classes="stat-row",
                 )
 
