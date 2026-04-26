@@ -1,9 +1,11 @@
+from datetime import datetime
 from typing import Any, ClassVar
+
 from textual.app import ComposeResult
 from textual.binding import Binding, BindingType
 from textual.message import Message
-from textual.widgets import Static
 from textual.widget import Widget
+from textual.widgets import Static
 
 
 def _get_team(competitors: list[dict], home_away: str) -> dict:
@@ -13,16 +15,25 @@ def _get_team(competitors: list[dict], home_away: str) -> dict:
     return competitors[0]
 
 
+def _format_local_time(date_str: str) -> str:
+    try:
+        dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+        return dt.astimezone().strftime("%H:%M %Z")
+    except Exception:
+        return date_str
+
+
 def _status_label(event: dict) -> str:
     status = event["status"]["type"]
     state = status.get("state", "pre")
-    detail = status.get("detail", "")
     if state == "in":
         clock = event["status"].get("displayClock", "")
         return f"[green]● LIVE {clock}[/green]"
     if state == "post":
-        return f"[dim]{detail or 'FT'}[/dim]"
-    return f"[dim]{detail or 'Upcoming'}[/dim]"
+        return f"[dim]{status.get('detail', 'FT')}[/dim]"
+    date_str = event.get("date", "")
+    local_time = _format_local_time(date_str) if date_str else status.get("detail", "")
+    return f"[dim]{local_time}[/dim]"
 
 
 class MatchCard(Widget, can_focus=True):
