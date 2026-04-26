@@ -62,6 +62,8 @@ class MatchDetail(Widget):
     DEFAULT_CSS = """
     MatchDetail {
         height: auto;
+        width: 80;
+        max-width: 100%;
         padding: 1 2;
     }
     MatchDetail .score-block {
