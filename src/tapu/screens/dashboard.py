@@ -2,7 +2,7 @@ import asyncio
 from typing import ClassVar
 from textual.app import ComposeResult
 from textual.binding import Binding, BindingType
-from textual.containers import ItemGrid
+from textual.containers import ItemGrid, VerticalScroll
 from textual.screen import Screen
 from textual.timer import Timer
 from textual.widgets import Footer, Header, Static
@@ -24,14 +24,18 @@ class DashboardScreen(Screen):
     ]
 
     DEFAULT_CSS = """
+    DashboardScreen > VerticalScroll {
+        height: 1fr;
+    }
     DashboardScreen .splash {
         width: 100%;
         padding: 1 2;
         color: $success;
+        overflow: hidden;
     }
     DashboardScreen .cards-grid {
         width: 100%;
-        height: 1fr;
+        height: auto;
         padding: 1;
     }
     """
@@ -53,8 +57,9 @@ class DashboardScreen(Screen):
 
     def compose(self) -> ComposeResult:
         yield Header()
-        yield Static(self.SPLASH, classes="splash")
-        yield ItemGrid(id="cards-grid", classes="cards-grid")
+        with VerticalScroll():
+            yield Static(self.SPLASH, classes="splash")
+            yield ItemGrid(id="cards-grid", classes="cards-grid", min_column_width=26)
         yield Footer()
 
     def on_mount(self) -> None:
