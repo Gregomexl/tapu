@@ -38,7 +38,7 @@ class MatchScreen(Screen):
         self.league = league
         self.event_id = event_id
         self.event = event
-        self._is_live = event["status"]["type"]["name"] == "STATUS_IN_PROGRESS"
+        self._is_live = event["status"]["type"].get("state") == "in"
         self._refresh_timer: Timer | None = None
 
     def compose(self) -> ComposeResult:
@@ -77,7 +77,7 @@ class MatchScreen(Screen):
             )
             if updated:
                 self.event = updated
-                self._is_live = updated["status"]["type"]["name"] == "STATUS_IN_PROGRESS"
+                self._is_live = updated["status"]["type"].get("state") == "in"
                 if not self._is_live and self._refresh_timer:
                     self._refresh_timer.stop()
             await self._load_summary()

@@ -14,13 +14,15 @@ def _get_team(competitors: list[dict], home_away: str) -> dict:
 
 
 def _status_label(event: dict) -> str:
-    status_name = event["status"]["type"]["name"]
-    if status_name == "STATUS_IN_PROGRESS":
+    status = event["status"]["type"]
+    state = status.get("state", "pre")
+    detail = status.get("detail", "")
+    if state == "in":
         clock = event["status"].get("displayClock", "")
         return f"[green]● LIVE {clock}[/green]"
-    if status_name == "STATUS_FINAL":
-        return "[dim]FT[/dim]"
-    return "[dim]Upcoming[/dim]"
+    if state == "post":
+        return f"[dim]{detail or 'FT'}[/dim]"
+    return f"[dim]{detail or 'Upcoming'}[/dim]"
 
 
 class MatchCard(Widget, can_focus=True):

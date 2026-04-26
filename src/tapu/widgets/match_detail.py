@@ -11,18 +11,29 @@ def _get_team(competitors: list[dict], home_away: str) -> dict:
     return competitors[0]
 
 
-def _format_scorers(plays: list[dict]) -> str:
-    goals = [
-        p for p in plays
-        if p.get("type", {}).get("id") == "96"
-    ]
+def _status_display(event: dict) -> str:
+    status = event["status"]["type"]
+    state = status.get("state", "pre")
+    detail = status.get("detail", "")
+    clock = event["status"].get("displayClock", "")
+
+    if state == "in":
+        return f"[green]● LIVE {clock}[/green]"
+    if state == "post":
+        return f"[dim]{detail or 'FT'}[/dim]"
+    return f"[dim]{detail or 'Upcoming'}[/dim]"
+
+
+def _format_scorers(key_events: list[dict]) -> str:
+    goals = [k for k in key_events if k.get("scoringPlay")]
     if not goals:
-        return "[dim]No scorers yet[/dim]"
+        return "[dim]No goals yet[/dim]"
     lines = []
     for g in goals:
-        scorer = g.get("participants", [{}])[0].get("athlete", {}).get("shortName", "?")
+        team = g.get("team", {}).get("displayName", "")
         clock = g.get("clock", {}).get("displayValue", "")
-        lines.append(f"  ⚽ {scorer} {clock}")
+        short_text = g.get("shortText", g.get("text", "Goal"))
+        lines.append(f"  ⚽ [bold]{clock}[/bold]  {short_text}  [dim]{team}[/dim]")
     return "\n".join(lines)
 
 
@@ -52,22 +63,17 @@ class MatchDetail(Widget):
         away_score = away.get("score", "-")
         home_name = home["team"]["displayName"]
         away_name = away["team"]["displayName"]
-        status = self.event["status"]["type"]["name"]
-        clock = self.event["status"].get("displayClock", "")
 
-        status_str = {
-            "STATUS_IN_PROGRESS": f"[green]● LIVE {clock}[/green]",
-            "STATUS_FINAL": "[dim]Full Time[/dim]",
-        }.get(status, "[dim]Upcoming[/dim]")
+        status_str = _status_display(self.event)
 
         yield Static(
             f"[bold]{home_name}[/bold]  {home_score} - {away_score}  [bold]{away_name}[/bold]\n"
             f"  {status_str}"
         )
 
-        plays = self.summary.get("plays", [])
+        key_events = self.summary.get("keyEvents", [])
         yield Static("Goal Scorers", classes="section-title")
-        yield Static(_format_scorers(plays))
+        yield Static(_format_scorers(key_events))
 
         boxscore = self.summary.get("boxscore", {})
         teams = boxscore.get("teams", [])

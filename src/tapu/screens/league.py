@@ -18,8 +18,8 @@ class LeagueScreen(Screen):
         Binding("b", "app.pop_screen", "Back", show=False),
         Binding("r", "refresh", "Refresh"),
         Binding("?", "app.open_chat", "Chat"),
-        Binding("up", "focus_previous", "Prev", show=False),
-        Binding("down", "focus_next", "Next", show=False),
+        Binding("up", "app.focus_previous", "Prev", show=False),
+        Binding("down", "app.focus_next", "Next", show=False),
     ]
 
     DEFAULT_CSS = """

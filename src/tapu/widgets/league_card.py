@@ -69,7 +69,7 @@ class LeagueCard(Widget, can_focus=True):
         events = scoreboard.get("events", [])
         self.live_count = sum(
             1 for e in events
-            if e["status"]["type"]["name"] == "STATUS_IN_PROGRESS"
+            if e["status"]["type"].get("state") == "in"
         )
         leagues_data = scoreboard.get("leagues", [])
         logos = leagues_data[0].get("logos", []) if leagues_data else []
