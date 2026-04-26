@@ -4,6 +4,7 @@ from typing import Any
 import httpx
 
 BASE_URL = "https://site.api.espn.com/apis/site/v2/sports/soccer"
+STANDINGS_URL = "https://site.web.api.espn.com/apis/v2/sports/soccer"
 
 
 class ESPNClient:
@@ -32,7 +33,7 @@ class ESPNClient:
         return await self._get(f"{BASE_URL}/{slug}/scoreboard", cache_ttl=10.0)
 
     async def get_standings(self, slug: str) -> dict[str, Any]:
-        return await self._get(f"{BASE_URL}/{slug}/standings")
+        return await self._get(f"{STANDINGS_URL}/{slug}/standings")
 
     async def get_match_summary(self, slug: str, event_id: str) -> dict[str, Any]:
         return await self._get(

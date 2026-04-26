@@ -2,11 +2,11 @@ from typing import Any
 from textual.widgets import DataTable
 
 
-def _stat(stats: list[dict], name: str) -> int:
+def _stat(stats: list[dict], name: str) -> str:
     for s in stats:
         if s["name"] == name:
-            return int(s["value"])
-    return 0
+            return s.get("displayValue") or str(s.get("value", "0"))
+    return "-"
 
 
 class StandingsTable(DataTable):
@@ -23,17 +23,19 @@ class StandingsTable(DataTable):
 
     def on_mount(self) -> None:
         self.add_columns("#", "Team", "P", "W", "D", "L", "GD", "Pts")
-        entries = self._data.get("standings", {}).get("entries", [])
+        children = self._data.get("children", [])
+        standings = children[0].get("standings", {}) if children else self._data.get("standings", {})
+        entries = standings.get("entries", [])
         for i, entry in enumerate(entries, 1):
             team = entry["team"]["abbreviation"]
             stats = entry["stats"]
             self.add_row(
                 str(i),
                 team,
-                str(_stat(stats, "gamesPlayed")),
-                str(_stat(stats, "wins")),
-                str(_stat(stats, "ties")),
-                str(_stat(stats, "losses")),
-                str(_stat(stats, "pointDifferential")),
-                str(_stat(stats, "points")),
+                _stat(stats, "gamesPlayed"),
+                _stat(stats, "wins"),
+                _stat(stats, "ties"),
+                _stat(stats, "losses"),
+                _stat(stats, "pointDifferential"),
+                _stat(stats, "points"),
             )
