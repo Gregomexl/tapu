@@ -20,6 +20,9 @@ class MatchScreen(Screen):
     ]
 
     DEFAULT_CSS = """
+    MatchScreen > VerticalScroll {
+        background: $surface;
+    }
     MatchScreen .loading {
         padding: 2;
         color: $text-muted;

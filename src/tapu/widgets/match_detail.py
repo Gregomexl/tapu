@@ -29,6 +29,22 @@ def _format_clock(seconds: float) -> str:
     return f"{m}:{s:02d}"
 
 
+def _stat_bar(home_raw: str, away_raw: str, width: int = 10) -> tuple[str, str]:
+    try:
+        hv = float(home_raw.replace("%", "").strip())
+        av = float(away_raw.replace("%", "").strip())
+    except (ValueError, AttributeError):
+        return "░" * width, "░" * width
+    total = hv + av
+    if total == 0:
+        return "░" * width, "░" * width
+    h_fill = round(hv / total * width)
+    a_fill = round(av / total * width)
+    home_bar = f"[green]{'█' * h_fill}[/green][dim]{'░' * (width - h_fill)}[/dim]"
+    away_bar = f"[dim]{'░' * (width - a_fill)}[/dim][red]{'█' * a_fill}[/red]"
+    return home_bar, away_bar
+
+
 STAT_KEYS = [
     ("possessionPct", "Possession"),
     ("totalShots", "Shots"),
@@ -48,13 +64,13 @@ class MatchDetail(Widget):
         height: auto;
         padding: 1 2;
     }
-    MatchDetail .score-header {
+    MatchDetail .score-block {
         text-align: center;
-        padding: 1 0 0 0;
+        padding: 1 0;
     }
     MatchDetail .status-line {
         text-align: center;
-        padding: 0 0 1 0;
+        margin: 0 0 1 0;
     }
     MatchDetail .section-label {
         color: $primary;
@@ -76,8 +92,12 @@ class MatchDetail(Widget):
         width: 1fr;
         padding: 0 0 0 1;
     }
-    MatchDetail .stats-block {
-        margin: 0 0 1 0;
+    MatchDetail .stats-header {
+        text-style: bold;
+        margin: 0 0 0 0;
+    }
+    MatchDetail .stat-row {
+        height: 1;
     }
     """
 
@@ -101,13 +121,15 @@ class MatchDetail(Widget):
         away_abbr = away["team"]["abbreviation"]
         home_id = str(home["team"]["id"])
 
+        # Score
         yield Static(
             f"[bold]{home_name}[/bold]  "
-            f"[bold yellow]{home_score} - {away_score}[/bold yellow]  "
+            f"[bold yellow]{home_score}  —  {away_score}[/bold yellow]  "
             f"[bold]{away_name}[/bold]",
-            classes="score-header",
+            classes="score-block",
         )
 
+        # Status / clock
         status = self.event["status"]["type"]
         state = status.get("state", "pre")
         if state == "in":
@@ -118,13 +140,11 @@ class MatchDetail(Widget):
             date_str = self.event.get("date", "")
             local_time = _format_local_time(date_str) if date_str else status.get("detail", "Upcoming")
             status_text = f"[dim]{local_time}[/dim]"
-
         yield Static(status_text, id="status-clock", classes="status-line")
 
         # Goals
         key_events = self.summary.get("keyEvents", [])
         goals = [k for k in key_events if k.get("scoringPlay")]
-
         yield Static("⚽  Goals", classes="section-label")
 
         if not goals:
@@ -139,7 +159,7 @@ class MatchDetail(Widget):
                 if team_id == home_id:
                     home_lines.append(f"[green]●[/green] [bold]{clock_val}[/bold]  {name}")
                 else:
-                    away_lines.append(f"[bold]{clock_val}[/bold]  {name}  [green]●[/green]")
+                    away_lines.append(f"[bold]{clock_val}[/bold]  {name}  [red]●[/red]")
 
             rows = max(len(home_lines), len(away_lines), 1)
             home_lines += [""] * (rows - len(home_lines))
@@ -151,7 +171,7 @@ class MatchDetail(Widget):
                 Static("\n".join(away_lines), classes="goals-away"),
             )
 
-        # Stats
+        # Stats with progress bars
         teams_data = self.summary.get("boxscore", {}).get("teams", [])
         if len(teams_data) >= 2:
             by_id = {str(td["team"]["id"]): td for td in teams_data}
@@ -161,15 +181,20 @@ class MatchDetail(Widget):
             h = {s["name"]: s["displayValue"] for s in home_td.get("statistics", [])}
             a = {s["name"]: s["displayValue"] for s in away_td.get("statistics", [])}
 
-            lines = [f"[bold]📊  Stats         {home_abbr:>5}   {away_abbr:<5}[/bold]"]
-            lines.append("─" * 36)
+            yield Static(
+                f"📊  [bold]{home_abbr}[/bold]                         [bold]{away_abbr}[/bold]",
+                classes="section-label",
+            )
+
             for key, label in STAT_KEYS:
                 hv, av = h.get(key, "-"), a.get(key, "-")
                 if hv == "-" and av == "-":
                     continue
-                lines.append(f"  {label:<16}  {hv:>5}   {av:<5}")
-
-            yield Static("\n".join(lines), classes="stats-block")
+                home_bar, away_bar = _stat_bar(hv, av)
+                yield Static(
+                    f"  {home_bar} [bold]{hv:>5}[/bold]  [dim]{label:<12}[/dim]  [bold]{av:<5}[/bold] {away_bar}",
+                    classes="stat-row",
+                )
 
     def on_mount(self) -> None:
         if self._is_live:
