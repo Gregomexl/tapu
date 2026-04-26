@@ -101,6 +101,9 @@ class MatchDetail(Widget):
     MatchDetail .stat-row {
         height: 1;
     }
+    MatchDetail Horizontal {
+        height: auto;
+    }
     """
 
     def __init__(self, event: dict[str, Any], summary: dict[str, Any]) -> None:
