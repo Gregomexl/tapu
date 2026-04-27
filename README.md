@@ -15,11 +15,12 @@ Tapú (from Zapotec: *tapu'*, the ancient Mesoamerican ball game) is a terminal 
 
 ## Features
 
-- Live scoreboards for UCL, UEL, Premier League, La Liga, FIFA World Cup, Liga MX
-- League standings tables
-- Match detail: scorers, stats, lineups
-- Config-driven — add any ESPN league with one line in `leagues.toml`
-- Powered by the public ESPN API (no API key required)
+- Live scoreboards for UCL, UEL, Premier League, La Liga, Bundesliga, Ligue 1, Liga MX, Liga Profesional, FIFA World Cup
+- League standings with relegation zone highlighting
+- Match detail: goals, cards, live commentary, and stats with progress bars
+- Auto-refreshes every 60 seconds — no manual reload needed
+- Config-driven — add any ESPN league with one entry in `leagues.toml`
+- No API key required — powered by the public ESPN API
 
 ## Install
 
