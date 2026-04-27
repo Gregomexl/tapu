@@ -1,5 +1,6 @@
 from typing import Any
 
+from rich.text import Text
 from textual.app import ComposeResult
 from textual.widget import Widget
 from textual.widgets import DataTable, Label
@@ -12,20 +13,29 @@ def _stat(stats: list[dict], name: str) -> str:
     return "-"
 
 
-def _fill_table(table: DataTable, entries: list[dict]) -> None:
+def _fill_table(table: DataTable, entries: list[dict], relegation_spots: int = 0) -> None:
     table.add_columns("#", "Team", "P", "W", "D", "L", "GD", "Pts")
+    total = len(entries)
     for i, entry in enumerate(entries, 1):
-        team = entry["team"]["abbreviation"]
+        team = entry["team"].get("shortDisplayName") or entry["team"]["abbreviation"]
         stats = entry.get("stats", [])
+        relegated = relegation_spots > 0 and i > total - relegation_spots
+
+        def cell(s: str, r: bool = relegated) -> Text:
+            t = Text(s)
+            if r:
+                t.stylize("bold red")
+            return t
+
         table.add_row(
-            str(i),
-            team,
-            _stat(stats, "gamesPlayed"),
-            _stat(stats, "wins"),
-            _stat(stats, "ties"),
-            _stat(stats, "losses"),
-            _stat(stats, "pointDifferential"),
-            _stat(stats, "points"),
+            cell(str(i)),
+            cell(team),
+            cell(_stat(stats, "gamesPlayed")),
+            cell(_stat(stats, "wins")),
+            cell(_stat(stats, "ties")),
+            cell(_stat(stats, "losses")),
+            cell(_stat(stats, "pointDifferential")),
+            cell(_stat(stats, "points")),
         )
 
 
@@ -46,14 +56,14 @@ class StandingsTable(Widget):
     }
     """
 
-    def __init__(self, data: dict[str, Any]) -> None:
+    def __init__(self, data: dict[str, Any], relegation_spots: int = 0) -> None:
         super().__init__()
         self._data = data
+        self._relegation_spots = relegation_spots
 
     def compose(self) -> ComposeResult:
         children = self._data.get("children", [])
         if len(children) > 1:
-            # multi-group (e.g. World Cup)
             for child in children:
                 group_name = child.get("name", "Group")
                 entries = child.get("standings", {}).get("entries", [])
@@ -61,12 +71,11 @@ class StandingsTable(Widget):
                     continue
                 yield Label(group_name)
                 table = DataTable()
-                _fill_table(table, entries)
+                _fill_table(table, entries, self._relegation_spots)
                 yield table
         else:
-            # single table (regular league)
             standings = children[0].get("standings", {}) if children else self._data.get("standings", {})
             entries = standings.get("entries", [])
             table = DataTable()
-            _fill_table(table, entries)
+            _fill_table(table, entries, self._relegation_spots)
             yield table

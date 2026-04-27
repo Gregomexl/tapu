@@ -7,6 +7,8 @@ from textual.message import Message
 from textual.widget import Widget
 from textual.widgets import Static
 
+from tapu.api import ESPNClient
+
 
 def _get_team(competitors: list[dict], home_away: str) -> dict:
     for c in competitors:
@@ -44,7 +46,7 @@ class MatchCard(Widget, can_focus=True):
     DEFAULT_CSS = """
     MatchCard {
         height: auto;
-        padding: 0 1;
+        padding: 1 1;
         margin: 0 0 1 0;
         border: solid $surface-lighten-2;
     }
@@ -56,31 +58,46 @@ class MatchCard(Widget, can_focus=True):
     }
     """
 
-    def __init__(self, event: dict[str, Any]) -> None:
+    def __init__(self, event: dict[str, Any], client: ESPNClient | None = None, positions: dict[str, int] | None = None) -> None:
         super().__init__()
         self.event = event
+        self._client = client
+        self._positions = positions or {}
         competitors = event["competitions"][0]["competitors"]
         self._home = _get_team(competitors, "home")
         self._away = _get_team(competitors, "away")
-        self.is_live = event["status"]["type"]["name"] == "STATUS_IN_PROGRESS"
+        self.is_live = event["status"]["type"].get("state") == "in"
         if self.is_live:
             self.add_class("live")
 
     def compose(self) -> ComposeResult:
-        home_abbr = self._home["team"]["abbreviation"]
-        away_abbr = self._away["team"]["abbreviation"]
+        home_abbr = self._home["team"].get("shortDisplayName") or self._home["team"]["abbreviation"]
+        away_abbr = self._away["team"].get("shortDisplayName") or self._away["team"]["abbreviation"]
         home_score = self._home.get("score", "-")
         away_score = self._away.get("score", "-")
         status = _status_label(self.event)
+
+
+        venue = self.event["competitions"][0].get("venue", {})
+        stadium = venue.get("fullName", "")
+        city = venue.get("address", {}).get("city", "")
+        location = f"{stadium}, {city}" if stadium and city else stadium or city
+
+        notes = self.event["competitions"][0].get("notes", [])
+        group = notes[0].get("headline", "") if notes else ""
+
         yield Static(
-            f"[bold]{home_abbr}[/bold] {home_score} - {away_score} [bold]{away_abbr}[/bold]"
-            f"  {status}"
+            f"[bold]{home_abbr}[/bold]  {home_score} – {away_score}  [bold]{away_abbr}[/bold]  {status}"
         )
+        second_line = "  ".join(filter(None, [group, f"[dim]{location}[/dim]" if location else ""]))
+        if second_line:
+            yield Static(f"[dim]{second_line}[/dim]")
 
     def action_select(self) -> None:
-        self.post_message(self.Selected(self.event["id"]))
+        self.post_message(self.Selected(self.event["id"], self.event))
 
     class Selected(Message):
-        def __init__(self, event_id: str) -> None:
+        def __init__(self, event_id: str, event: dict) -> None:
             super().__init__()
             self.event_id = event_id
+            self.event = event
