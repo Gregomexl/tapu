@@ -23,14 +23,27 @@ Tapú (from Zapotec: *tapu'*, the ancient Mesoamerican ball game) is a terminal 
 
 ## Install
 
+**Requirements:** [uv](https://docs.astral.sh/uv/getting-started/installation/) and Python 3.13+
+
 ```bash
-uv tool install tapu
+# macOS
+brew install uv
 ```
 
-Or run directly:
+Then clone and run:
 
 ```bash
-uvx tapu
+git clone https://github.com/gregomexl/tapu
+cd tapu
+uv run tapu
+```
+
+Or install as a global command:
+
+```bash
+cd tapu
+uv tool install .
+tapu
 ```
 
 ## Usage
@@ -63,7 +76,7 @@ full_name = "Serie A"
 
 ## Requirements
 
-- Python 3.13+
+- [uv](https://docs.astral.sh/uv/getting-started/installation/) (handles Python 3.13+ automatically)
 - [chafa](https://hpjansson.org/chafa/) (optional — for team logos in match detail)
 
 ## License
