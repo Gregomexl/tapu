@@ -1,9 +1,8 @@
-import time
 from datetime import datetime
 from typing import Any
 
 from textual.app import ComposeResult
-from textual.containers import Horizontal
+from textual.containers import Horizontal  # used for goals/cards rows
 from textual.widget import Widget
 from textual.widgets import Static
 
@@ -23,13 +22,17 @@ def _format_local_time(date_str: str) -> str:
         return date_str
 
 
-def _format_clock(seconds: float) -> str:
-    m = int(seconds // 60)
-    s = int(seconds % 60)
-    return f"{m}:{s:02d}"
+def _fmt_stat(raw: str, is_pct: bool = False) -> str:
+    if raw == "-":
+        return "-"
+    try:
+        val = float(raw.replace("%", "").strip())
+        return f"{round(val)}%" if is_pct else str(round(val)) if "." in raw else raw.strip()
+    except (ValueError, AttributeError):
+        return raw
 
 
-def _stat_bar(home_raw: str, away_raw: str, width: int = 10) -> tuple[str, str]:
+def _stat_bar(home_raw: str, away_raw: str, width: int = 12) -> tuple[str, str]:
     try:
         hv = float(home_raw.replace("%", "").strip())
         av = float(away_raw.replace("%", "").strip())
@@ -46,15 +49,15 @@ def _stat_bar(home_raw: str, away_raw: str, width: int = 10) -> tuple[str, str]:
 
 
 STAT_KEYS = [
-    ("possessionPct", "Possession"),
-    ("totalShots", "Shots"),
-    ("shotsOnTarget", "On Goal"),
-    ("foulsCommitted", "Fouls"),
-    ("yellowCards", "Yellows"),
-    ("redCards", "Reds"),
-    ("wonCorners", "Corners"),
-    ("saves", "Saves"),
-    ("offsides", "Offsides"),
+    ("possessionPct", "Possession", True),
+    ("totalShots", "Shots", False),
+    ("shotsOnTarget", "On Goal", False),
+    ("foulsCommitted", "Fouls", False),
+    ("yellowCards", "Yellows", False),
+    ("redCards", "Reds", False),
+    ("wonCorners", "Corners", False),
+    ("saves", "Saves", False),
+    ("offsides", "Offsides", False),
 ]
 
 
@@ -67,16 +70,18 @@ class MatchDetail(Widget):
         padding: 1 2;
     }
     MatchDetail .score-block {
+        width: 1fr;
         text-align: center;
         padding: 1 0;
     }
     MatchDetail .status-line {
         text-align: center;
-        margin: 0 0 1 0;
+        margin: 0 0 0 0;
     }
     MatchDetail .section-label {
         color: $primary;
         text-style: bold;
+        text-align: left;
         border-top: solid $surface-lighten-2;
         padding: 1 0 0 0;
         margin: 1 0 0 0;
@@ -94,24 +99,29 @@ class MatchDetail(Widget):
         width: 1fr;
         padding: 0 0 0 1;
     }
-    MatchDetail .stats-header {
-        text-style: bold;
-        margin: 0 0 0 0;
-    }
     MatchDetail .stat-row {
         height: 1;
         text-align: center;
     }
-    MatchDetail .stats-abbr {
+    MatchDetail .stats-header {
         text-align: center;
-        padding: 0 0 0 0;
+        color: $text-muted;
+        text-style: bold;
+        margin: 0 0 0 0;
     }
     MatchDetail Horizontal {
         height: auto;
+        margin: 0 0 0 0;
     }
     MatchDetail .commentary {
         color: $text-muted;
         padding: 0 0 1 0;
+        text-align: left;
+    }
+    MatchDetail .venue-line {
+        text-align: center;
+        color: $text-muted;
+        margin: 0 0 1 0;
     }
     """
 
@@ -119,48 +129,79 @@ class MatchDetail(Widget):
         self,
         event: dict[str, Any],
         summary: dict[str, Any],
-        clock_base: float | None = None,
-        clock_mono: float | None = None,
+        client=None,
+        positions: dict[str, int] | None = None,
     ) -> None:
         super().__init__()
         self.event = event
         self.summary = summary
+        self._client = client
+        self._positions = positions or {}
         self._is_live = event["status"]["type"].get("state") == "in"
-        self._base_clock = clock_base if clock_base is not None else event["status"].get("clock", 0.0)
-        self._fetch_mono = clock_mono if clock_mono is not None else time.monotonic()
 
     def compose(self) -> ComposeResult:
-        competitors = self.event["competitions"][0]["competitors"]
+        competition = self.event["competitions"][0]
+        competitors = competition["competitors"]
         home = _get_team(competitors, "home")
         away = _get_team(competitors, "away")
         home_score = home.get("score", "-")
         away_score = away.get("score", "-")
         home_name = home["team"]["displayName"]
         away_name = away["team"]["displayName"]
-        home_abbr = home["team"]["abbreviation"]
-        away_abbr = away["team"]["abbreviation"]
+        home_abbr = home["team"].get("shortDisplayName") or home["team"]["abbreviation"]
+        away_abbr = away["team"].get("shortDisplayName") or away["team"]["abbreviation"]
         home_id = str(home["team"]["id"])
 
-        # Score
+
+        # Group label (UCL, Europa, World Cup, etc.)
+        notes = competition.get("notes", [])
+        group = notes[0].get("headline", "") if notes else ""
+        if group:
+            yield Static(f"[dim]{group}[/dim]", classes="status-line")
+
+        # Team color badges
+        def _badge(team: dict) -> str:
+            color = team.get("color", "")
+            hex_color = f"#{color}" if color and len(color) == 6 else None
+            if hex_color:
+                return f"[on {hex_color}][{hex_color}]  [/{hex_color}][/on {hex_color}]"
+            return ""
+
+        home_badge = _badge(home["team"])
+        away_badge = _badge(away["team"])
         yield Static(
-            f"[bold]{home_name}[/bold]  "
-            f"[bold yellow]{home_score}  —  {away_score}[/bold yellow]  "
-            f"[bold]{away_name}[/bold]",
+            f"{home_badge} [bold]{home_name}[/bold]  "
+            f"[bold yellow]{home_score}  –  {away_score}[/bold yellow]  "
+            f"[bold]{away_name}[/bold] {away_badge}",
             classes="score-block",
         )
+
+        # Date
+        date_str = self.event.get("date", "")
+        if date_str:
+            yield Static(f"[dim]{_format_local_time(date_str)}[/dim]", classes="status-line")
 
         # Status / clock
         status = self.event["status"]["type"]
         state = status.get("state", "pre")
         if state == "in":
-            status_text = f"[green]● LIVE {_format_clock(self._base_clock)}[/green]"
+            display_clock = self.event["status"].get("displayClock", "")
+            period = self.event["status"].get("period", 0)
+            period_label = "HT" if display_clock == "45:00" and period == 1 else f"{display_clock}'"
+            status_text = f"[green bold]● LIVE {period_label}[/green bold]"
         elif state == "post":
             status_text = f"[dim]{status.get('detail', 'FT')}[/dim]"
         else:
-            date_str = self.event.get("date", "")
-            local_time = _format_local_time(date_str) if date_str else status.get("detail", "Upcoming")
-            status_text = f"[dim]{local_time}[/dim]"
+            status_text = f"[dim]{status.get('detail', 'Upcoming')}[/dim]"
         yield Static(status_text, id="status-clock", classes="status-line")
+
+        # Venue
+        venue = competition.get("venue", {})
+        stadium = venue.get("fullName", "")
+        city = venue.get("address", {}).get("city", "")
+        if stadium or city:
+            location = f"{stadium} · {city}" if stadium and city else stadium or city
+            yield Static(f"[dim]{location}[/dim]", classes="venue-line")
 
         # Live commentary
         if state == "in":
@@ -171,12 +212,9 @@ class MatchDetail(Widget):
                 for c in recent:
                     minute = c.get("time", {}).get("displayValue", "")
                     text = c.get("text", "")
-                    prefix = f"[dim]{minute:>3}[/dim]  " if minute else "     "
+                    prefix = f"[dim]{minute:>3}'[/dim]  " if minute else "      "
                     lines.append(f"{prefix}{text}")
-                yield Static(
-                    "[bold dim]── Live Updates " + "─" * 20 + "[/bold dim]",
-                    classes="section-label",
-                )
+                yield Static("── Live Updates", classes="section-label")
                 yield Static("\n".join(lines), id="commentary", classes="commentary")
 
         # Goals
@@ -193,10 +231,11 @@ class MatchDetail(Widget):
                 team_id = str(g.get("team", {}).get("id", ""))
                 clock_val = g.get("clock", {}).get("displayValue", "")
                 name = g.get("shortText", "Goal").replace(" Goal", "")
+                # Mirror layout: home right-aligned (name → clock), away left-aligned (clock → name)
                 if team_id == home_id:
-                    home_lines.append(f"[green]●[/green] [bold]{clock_val}[/bold]  {name}")
+                    home_lines.append(f"{name}  [dim]{clock_val}'[/dim]")
                 else:
-                    away_lines.append(f"[bold]{clock_val}[/bold]  {name}  [red]●[/red]")
+                    away_lines.append(f"[dim]{clock_val}'[/dim]  {name}")
 
             rows = max(len(home_lines), len(away_lines), 1)
             home_lines += [""] * (rows - len(home_lines))
@@ -224,11 +263,11 @@ class MatchDetail(Widget):
                     icon = "[bold red]■[/bold red]"
                 else:
                     icon = "[bold yellow]▪[/bold yellow][bold red]■[/bold red]"
-                line = f"{icon} [bold]{clock_val}[/bold]  {name}"
+                # Mirror layout: home right-aligned (name → clock → icon), away left-aligned (icon → clock → name)
                 if team_id == home_id:
-                    home_cards.append(line)
+                    home_cards.append(f"{name}  [dim]{clock_val}'[/dim]  {icon}")
                 else:
-                    away_cards.append(f"[bold]{clock_val}[/bold]  {name}  {icon}")
+                    away_cards.append(f"{icon}  [dim]{clock_val}'[/dim]  {name}")
 
             if home_cards or away_cards:
                 yield Static("🟨  Cards", classes="section-label")
@@ -253,30 +292,18 @@ class MatchDetail(Widget):
 
             yield Static("📊  Stats", classes="section-label")
             yield Static(
-                f"[bold]{home_abbr}[/bold]                                   [bold]{away_abbr}[/bold]",
-                classes="stats-abbr",
+                f"[bold]{home_abbr}[/bold]                                         [bold]{away_abbr}[/bold]",
+                classes="stats-header",
             )
 
-            for key, label in STAT_KEYS:
+            for key, label, is_pct in STAT_KEYS:
                 hv, av = h.get(key, "-"), a.get(key, "-")
                 if hv == "-" and av == "-":
                     continue
                 home_bar, away_bar = _stat_bar(hv, av)
+                hv_display = _fmt_stat(hv, is_pct)
+                av_display = _fmt_stat(av, is_pct)
                 yield Static(
-                    f"{home_bar} [bold]{hv:>5}[/bold]  [dim]{label:<12}[/dim]  [bold]{av:<5}[/bold] {away_bar}",
+                    f"[bold]{hv_display:>6}[/bold] {home_bar}  [dim]{label:<12}[/dim]  {away_bar} [bold]{av_display:<6}[/bold]",
                     classes="stat-row",
                 )
-
-    def on_mount(self) -> None:
-        if self._is_live:
-            self.set_interval(1, self._tick)
-
-    def _tick(self) -> None:
-        elapsed = time.monotonic() - self._fetch_mono
-        clock_str = _format_clock(self._base_clock + elapsed)
-        try:
-            self.query_one("#status-clock", Static).update(
-                f"[green]● LIVE {clock_str}[/green]"
-            )
-        except Exception:
-            pass
