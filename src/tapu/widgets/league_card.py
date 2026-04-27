@@ -6,6 +6,7 @@ from textual.message import Message
 from textual.widget import Widget
 from textual.widgets import Static
 
+from tapu.api import ESPNClient
 from tapu.config import League
 
 
@@ -16,12 +17,11 @@ class LeagueCard(Widget, can_focus=True):
 
     DEFAULT_CSS = """
     LeagueCard {
-        height: 7;
+        height: 6;
         width: 1fr;
         min-width: 24;
-        padding: 1 2;
+        padding: 1 1;
         margin: 0 1 1 0;
-        border-left: thick $surface-lighten-2;
         border: solid $surface-lighten-2;
     }
     LeagueCard:focus {
@@ -32,10 +32,17 @@ class LeagueCard(Widget, can_focus=True):
     }
     """
 
-    def __init__(self, league: League, scoreboard: dict[str, Any]) -> None:
-        super().__init__()
+    def __init__(
+        self,
+        league: League,
+        scoreboard: dict[str, Any],
+        client: ESPNClient | None = None,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(**kwargs)
         self.league = league
         self.scoreboard = scoreboard
+        self._client = client
         events = scoreboard.get("events", [])
         self.live_count = sum(
             1 for e in events
@@ -62,7 +69,9 @@ class LeagueCard(Widget, can_focus=True):
                 f"{home.get('score', '-')}-{away.get('score', '-')} "
                 f"{away['team']['abbreviation']}"
             )
-        yield Static(f"[bold]{self.league.name}[/bold]  {live_label}")
+
+        flag = f"{self.league.flag}  " if self.league.flag else ""
+        yield Static(f"{flag}[bold]{self.league.name}[/bold]  {live_label}")
         yield Static(f"[dim]{self.league.full_name}[/dim]")
         yield Static(top_match or "[dim]No matches today[/dim]")
 
