@@ -44,13 +44,16 @@ class DashboardScreen(Screen):
     }
     """
 
-    SPLASH = """\
-  ████████╗ █████╗ ██████╗ ██╗   ██╗
-  ╚══██╔══╝██╔══██╗██╔══██╗██║   ██║
-     ██║   ███████║██████╔╝██║   ██║
-     ██║   ██╔══██║██╔═══╝ ██║   ██║
-     ██║   ██║  ██║██║     ╚██████╔╝
-     ╚═╝   ╚═╝  ╚═╝╚═╝      ╚═════╝  ⚽"""
+    SPLASH = (
+        r"""  ████████╗ █████╗ ██████╗ ██╗   ██╗      _,...,_
+  ╚══██╔══╝██╔══██╗██╔══██╗██║   ██║    .'@/   \@'.
+     ██║   ███████║██████╔╝██║   ██║   //  \___/  \\
+     ██║   ██╔══██║██╔═══╝ ██║   ██║  |@\__/a@a\__/a|
+     ██║   ██║  ██║██║     ╚██████╔╝  |a/  \@@@/  \@|
+     ╚═╝   ╚═╝  ╚═╝╚═╝      ╚═════╝   \\__/   \__//
+                                        `.a\___/a.'
+                                          `'""" + '""""'
+    )
 
     def __init__(self, client: ESPNClient, leagues: list[League]) -> None:
         super().__init__()
@@ -63,7 +66,7 @@ class DashboardScreen(Screen):
         yield Header()
         with VerticalScroll():
             yield Static(self.SPLASH, classes="splash")
-            yield ItemGrid(id="cards-grid", classes="cards-grid", min_column_width=26)
+            yield ItemGrid(id="cards-grid", classes="cards-grid", min_column_width=40)
         yield Footer()
 
     def on_mount(self) -> None:
@@ -77,25 +80,23 @@ class DashboardScreen(Screen):
     async def _bg_refresh(self) -> None:
         await self._load_all()
 
-    async def _fetch_one(self, league: League, grid: ItemGrid) -> None:
-        try:
-            sb = await self.client.get_scoreboard(league.slug)
-        except Exception:
-            await grid.mount(Static(f"[red]{league.name}: unavailable[/red]"))
-            return
-        self._scoreboards[league.slug] = sb
-        card_id = f"card-{league.slug.replace('.', '-')}"
-        old = grid.query(f"#{card_id}")
-        card = LeagueCard(league, sb, self.client, id=card_id)
-        if old:
-            await old.first().remove()
-        await grid.mount(card)
-
     async def _load_all(self) -> None:
+        # Fetch all scoreboards concurrently, tolerating individual failures
+        results = await asyncio.gather(
+            *[self.client.get_scoreboard(l.slug) for l in self.leagues],
+            return_exceptions=True,
+        )
+        for league, result in zip(self.leagues, results):
+            if not isinstance(result, Exception):
+                self._scoreboards[league.slug] = result
+
+        # Render all cards in one sequential pass — no race conditions
         grid = self.query_one("#cards-grid", ItemGrid)
-        if not self._scoreboards:
-            await grid.remove_children()
-        await asyncio.gather(*[self._fetch_one(l, grid) for l in self.leagues])
+        await grid.remove_children()
+        for league in self.leagues:
+            card_id = f"card-{league.slug.replace('.', '-')}"
+            sb = self._scoreboards.get(league.slug, {})
+            await grid.mount(LeagueCard(league, sb, self.client, id=card_id))
         cards = list(grid.query(LeagueCard))
         if cards:
             cards[0].focus()
@@ -107,5 +108,6 @@ class DashboardScreen(Screen):
 
     def on_league_card_selected(self, message: LeagueCard.Selected) -> None:
         from tapu.screens.league import LeagueScreen
+
         sb = self._scoreboards.get(message.league.slug, {})
         self.app.push_screen(LeagueScreen(self.client, message.league, sb))
