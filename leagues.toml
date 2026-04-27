@@ -3,33 +3,74 @@ slug = "uefa.champions"
 name = "UCL"
 full_name = "UEFA Champions League"
 color = "#1a56db"
+matchday_label = "Matchday"
+flag = "🇪🇺"
 
 [[leagues]]
 slug = "uefa.europa"
 name = "UEL"
 full_name = "UEFA Europa League"
 color = "#f05a28"
+matchday_label = "Matchday"
+flag = "🇪🇺"
 
 [[leagues]]
 slug = "eng.1"
 name = "EPL"
 full_name = "English Premier League"
 color = "#3d0068"
+matchday_label = "Matchweek"
+relegation_spots = 3
+flag = "🏴󠁧󠁢󠁥󠁮󠁧󠁿"
 
 [[leagues]]
 slug = "esp.1"
 name = "La Liga"
 full_name = "La Liga"
 color = "#ee8707"
+matchday_label = "Matchday"
+relegation_spots = 3
+flag = "🇪🇸"
 
 [[leagues]]
 slug = "fifa.world"
 name = "FIFA WC"
 full_name = "FIFA World Cup"
 color = "#c8a84b"
+matchday_label = "Matchday"
+flag = "🌍"
 
 [[leagues]]
 slug = "mex.1"
 name = "Liga MX"
 full_name = "Liga MX"
 color = "#006847"
+matchday_label = "Week"
+flag = "🇲🇽"
+
+[[leagues]]
+slug = "arg.1"
+name = "Liga Prof"
+full_name = "Liga Profesional de Fútbol"
+color = "#74acdf"
+matchday_label = "Fecha"
+relegation_spots = 3
+flag = "🇦🇷"
+
+[[leagues]]
+slug = "ger.1"
+name = "Bundesliga"
+full_name = "Bundesliga"
+color = "#d20515"
+matchday_label = "Matchday"
+relegation_spots = 3
+flag = "🇩🇪"
+
+[[leagues]]
+slug = "fra.1"
+name = "Ligue 1"
+full_name = "Ligue 1"
+color = "#0a2d6e"
+matchday_label = "Matchday"
+relegation_spots = 3
+flag = "🇫🇷"
