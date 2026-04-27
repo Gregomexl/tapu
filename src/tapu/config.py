@@ -9,6 +9,9 @@ class League:
     name: str
     full_name: str
     color: str = "#ffffff"
+    matchday_label: str = "Week"
+    relegation_spots: int = 0
+    flag: str = ""
 
 
 def load_leagues(path: Path | None = None) -> list[League]:
