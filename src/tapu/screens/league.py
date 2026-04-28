@@ -8,10 +8,11 @@ from textual.binding import Binding, BindingType
 from textual.containers import Horizontal, VerticalScroll
 from textual.screen import Screen
 from textual.timer import Timer
-from textual.widgets import Footer, Header, Static
+from textual.widgets import Footer, Header, Static, TabbedContent, TabPane
 
 from tapu.api import ESPNClient
-from tapu.config import League
+from tapu.config import League, RelatedTournament
+from tapu.widgets.bracket import BracketWidget, _event_round, _round_key
 from tapu.widgets.match_card import MatchCard
 from tapu.widgets.standings import StandingsTable
 
@@ -41,6 +42,15 @@ def _group_events_by_day(events: list) -> list[tuple[date, list]]:
         pre = [e for e in day_evs if e["status"]["type"].get("state") not in ("in", "post")]
         result.append((d, live + done + pre))
     return result
+
+
+def _group_events_by_round(events: list) -> list[tuple[str, list]]:
+    by_round: dict[str, list] = {}
+    for ev in events:
+        r = _event_round(ev)
+        if r:
+            by_round.setdefault(r, []).append(ev)
+    return sorted(by_round.items(), key=lambda x: _round_key(x[0]))
 
 
 def _day_label(d: date, today: date) -> str:
@@ -97,16 +107,29 @@ class LeagueScreen(Screen):
         self._days_back = 7
         self._refresh_timer: Timer | None = None
         self._positions: dict[str, int] = {}
+        self._loaded_tabs: set[str] = set()
 
     def compose(self) -> ComposeResult:
         yield Header()
-        with Horizontal(classes="main-row"):
-            yield VerticalScroll(
-                Static("[dim]Loading...[/dim]", classes="no-matches"),
-                id="matches-pane",
-                classes="matches-col",
-            )
-            yield VerticalScroll(id="standings-pane", classes="standings-col")
+        with TabbedContent():
+            with TabPane(self.league.full_name, id="tab-main"):
+                with Horizontal(classes="main-row"):
+                    yield VerticalScroll(
+                        Static("[dim]Loading...[/dim]", classes="no-matches"),
+                        id="matches-pane",
+                        classes="matches-col",
+                    )
+                    yield VerticalScroll(id="standings-pane", classes="standings-col")
+            for related in self.league.related:
+                tab_id = f"tab-{related.slug.replace('.', '-')}"
+                with TabPane(related.name, id=tab_id):
+                    with Horizontal(classes="main-row"):
+                        yield VerticalScroll(
+                            Static("[dim]Loading...[/dim]", classes="no-matches"),
+                            id=f"matches-{tab_id}",
+                            classes="matches-col",
+                        )
+                        yield VerticalScroll(id=f"bracket-{tab_id}", classes="standings-col")
         yield Footer()
 
     def on_mount(self) -> None:
@@ -171,12 +194,56 @@ class LeagueScreen(Screen):
             await pane.remove_children()
             await pane.mount(Static("[red]Standings unavailable[/red]"))
 
+    def on_tabbed_content_tab_activated(self, event: TabbedContent.TabActivated) -> None:
+        pane_id = event.pane.id if event.pane else None
+        if not pane_id or pane_id == "tab-main" or pane_id in self._loaded_tabs:
+            return
+        self._loaded_tabs.add(pane_id)
+        for related in self.league.related:
+            if f"tab-{related.slug.replace('.', '-')}" == pane_id:
+                self._load_tournament(related)
+                break
+
+    @work(exit_on_error=False)
+    async def _load_tournament(self, related: RelatedTournament) -> None:
+        tab_id = f"tab-{related.slug.replace('.', '-')}"
+        matches_pane = self.query_one(f"#matches-{tab_id}", VerticalScroll)
+        bracket_pane = self.query_one(f"#bracket-{tab_id}", VerticalScroll)
+        try:
+            data = await self.client.get_tournament_events(related.slug)
+            events = data.get("events", [])
+            await matches_pane.remove_children()
+            if not events:
+                await matches_pane.mount(Static("[dim]No matches[/dim]", classes="no-matches"))
+            else:
+                for round_name, round_evs in _group_events_by_round(events):
+                    await matches_pane.mount(Static(round_name, classes="section-header"))
+                    for ev in round_evs:
+                        await matches_pane.mount(MatchCard(ev))
+            await bracket_pane.remove_children()
+            await bracket_pane.mount(BracketWidget(events))
+        except Exception:
+            await matches_pane.remove_children()
+            await matches_pane.mount(Static("[red]Failed to load[/red]", classes="no-matches"))
+
     def action_refresh(self) -> None:
         self.client.clear_cache()
-        self.run_worker(self._load_matches())
-        self.run_worker(self._load_standings())
+        active = self.query_one(TabbedContent).active
+        if active == "tab-main" or not active:
+            self._positions.clear()
+            self.run_worker(self._load_matches())
+            self.run_worker(self._load_standings())
+        else:
+            self._loaded_tabs.discard(active)
+            for related in self.league.related:
+                if f"tab-{related.slug.replace('.', '-')}" == active:
+                    self._load_tournament(related)
+                    break
 
     def action_more(self) -> None:
+        active = self.query_one(TabbedContent).active
+        if active != "tab-main":
+            return
         self._days_back += 7
         self.run_worker(self._load_matches())
 
