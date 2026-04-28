@@ -50,11 +50,11 @@ def _round_key(headline: str) -> int:
 
 
 def _event_round(event: dict) -> str:
-    """Return display-ready round name. Tries notes headline first, falls back to season.slug."""
+    """Return display-ready round name. Only uses notes headline when it maps to a known round."""
     notes = event.get("competitions", [{}])[0].get("notes", [])
     if notes:
         headline = notes[0].get("headline", "").strip()
-        if headline:
+        if headline and _round_key(headline) < 99:
             return headline
     slug = event.get("season", {}).get("slug", "")
     return _SLUG_DISPLAY.get(slug, slug.replace("-", " ").title()) if slug else ""
@@ -70,6 +70,19 @@ def _winner_id(event: dict) -> str | None:
 
 def _team_name(comp: dict, width: int = 16) -> str:
     return (comp["team"].get("shortDisplayName") or comp["team"].get("abbreviation", "?"))[:width]
+
+
+_ROUND_COLORS = {
+    0: "bold yellow",    # Final
+    1: "bold cyan",      # Semifinals
+    2: "bold green",     # Quarterfinals
+    3: "bold blue",      # Round of 16
+    4: "bold magenta",   # Round of 32
+}
+
+
+def _round_color(key: int) -> str:
+    return _ROUND_COLORS.get(key, "bold white")
 
 
 def _bracket_lines(events: list[dict]) -> list[str]:
@@ -94,8 +107,10 @@ def _bracket_lines(events: list[dict]) -> list[str]:
     lines: list[str] = []
 
     for round_name, round_evs in sorted_rounds:
+        key = _round_key(round_name)
+        color = _round_color(key)
         sep = "─" * max(0, 40 - len(round_name) - 4)
-        lines.append(f"[bold cyan]── {round_name.upper()} {sep}[/bold cyan]")
+        lines.append(f"[{color}]── {round_name.upper()} {sep}[/{color}]")
         lines.append("")
 
         for ev in round_evs:
