@@ -88,7 +88,7 @@ def _bracket_lines(events: list[dict]) -> list[str]:
     if not has_knockout:
         return ["[dim]Bracket not yet available[/dim]"]
 
-    sorted_rounds = sorted(by_round.items(), key=lambda x: _round_key(x[0]), reverse=True)
+    sorted_rounds = sorted(by_round.items(), key=lambda x: _round_key(x[0]))
 
     NAME_W = 16
     lines: list[str] = []

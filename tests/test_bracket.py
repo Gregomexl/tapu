@@ -142,16 +142,16 @@ def test_bracket_lines_completed_match_shows_winner_arrow():
     assert "T10" in combined
 
 
-def test_bracket_lines_multiple_rounds_ordered_earliest_first():
+def test_bracket_lines_multiple_rounds_final_first():
     qf = _make_event("Quarterfinal", "10", "11", home_score="2", away_score="1", state="post", winner_id="10")
     sf = _make_event("Semifinal", "10", "13", home_score="1", away_score="0", state="post", winner_id="10")
     final = _make_event("Final", "10", "3", home_score="2", away_score="1", state="post", winner_id="10")
     combined = "\n".join(_bracket_lines([qf, sf, final]))
-    # Use the full header strings to avoid "FINAL" matching inside "SEMIFINAL"
-    qf_pos = combined.find("── QUARTERFINAL")
-    sf_pos = combined.find("── SEMIFINAL")
+    # Final → SF → QF top-to-bottom
     final_pos = combined.find("── FINAL")
-    assert qf_pos < sf_pos < final_pos
+    sf_pos = combined.find("── SEMIFINAL")
+    qf_pos = combined.find("── QUARTERFINAL")
+    assert final_pos < sf_pos < qf_pos
 
 
 def test_bracket_lines_pre_match_shows_vs():
