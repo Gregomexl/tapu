@@ -90,6 +90,16 @@ class ESPNClient:
             disk_ttl=3600.0,
         )
 
+    async def get_tournament_events(self, slug: str) -> dict[str, Any]:
+        today = datetime.now()
+        if today.month >= 8:
+            season_start = today.replace(month=8, day=1).strftime("%Y%m%d")
+            season_end = today.replace(year=today.year + 1, month=7, day=31).strftime("%Y%m%d")
+        else:
+            season_start = today.replace(year=today.year - 1, month=8, day=1).strftime("%Y%m%d")
+            season_end = today.replace(month=7, day=31).strftime("%Y%m%d")
+        return await self.get_scoreboard_daterange(slug, season_start, season_end)
+
     async def get_match_summary(self, slug: str, event_id: str) -> dict[str, Any]:
         return await self._get(
             f"{BASE_URL}/{slug}/summary?event={event_id}",

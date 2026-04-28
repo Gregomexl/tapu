@@ -84,3 +84,20 @@ async def test_aclose(client):
     with patch.object(client._http, "aclose", new_callable=AsyncMock) as mock_close:
         await client.aclose()
         mock_close.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_get_tournament_events_builds_season_date_range(client, sample_scoreboard):
+    with patch.object(client._http, "get", new_callable=AsyncMock) as mock_get, \
+         patch.object(client, "_read_disk", return_value=None):
+        mock_get.return_value = _mock_response(sample_scoreboard)
+
+        result = await client.get_tournament_events("esp.copa_del_rey")
+
+        url = mock_get.call_args[0][0]
+        assert "esp.copa_del_rey" in url
+        assert "scoreboard" in url
+        assert "dates=" in url
+        import re
+        assert re.search(r"dates=\d{8}-\d{8}", url)
+        assert result == sample_scoreboard
