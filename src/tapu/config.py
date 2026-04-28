@@ -4,6 +4,12 @@ from pathlib import Path
 
 
 @dataclass(frozen=True)
+class RelatedTournament:
+    name: str
+    slug: str
+
+
+@dataclass(frozen=True)
 class League:
     slug: str
     name: str
@@ -12,6 +18,7 @@ class League:
     matchday_label: str = "Week"
     relegation_spots: int = 0
     flag: str = ""
+    related: tuple[RelatedTournament, ...] = ()
 
 
 def load_leagues(path: Path | None = None) -> list[League]:
@@ -19,4 +26,9 @@ def load_leagues(path: Path | None = None) -> list[League]:
         path = Path(__file__).parent.parent.parent / "leagues.toml"
     with path.open("rb") as f:
         data = tomllib.load(f)
-    return [League(**entry) for entry in data["leagues"]]
+    leagues = []
+    for entry in data["leagues"]:
+        raw_related = entry.pop("related", [])
+        related = tuple(RelatedTournament(**r) for r in raw_related)
+        leagues.append(League(**entry, related=related))
+    return leagues
