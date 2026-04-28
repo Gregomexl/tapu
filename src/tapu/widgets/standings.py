@@ -48,6 +48,14 @@ def _fill_table(
     promotion_spots: int = 0,
 ) -> None:
     table.add_columns("#", "Team", "P", "W", "D", "L", "GD", "Pts")
+
+    def _rank(e: dict) -> int:
+        for s in e.get("stats", []):
+            if s["name"] == "rank":
+                return int(s.get("value", 999))
+        return 999
+
+    entries = sorted(entries, key=_rank)
     total = len(entries)
     for i, entry in enumerate(entries, 1):
         stats = {s["name"]: s for s in entry.get("stats", [])}

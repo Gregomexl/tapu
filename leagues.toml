@@ -65,7 +65,7 @@ full_name = "Liga Profesional"
 color = "#74acdf"
 matchday_label = "Fecha"
 relegation_spots = 3
-promotion_spots = 8
+promotion_spots = 4
 flag = "🇦🇷"
 related = [
   {name = "Copa Argentina", slug = "arg.copa"},
