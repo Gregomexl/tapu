@@ -117,7 +117,9 @@ def _bracket_lines(events: list[dict]) -> list[str]:
                 a = f"[bold cyan]{away_name}[/bold cyan]" if away_is_winner else f"[dim]{away_name}[/dim]"
                 score = f"[bold]{home_score}[/bold] [dim]–[/dim] [bold]{away_score}[/bold]"
                 winner_name = _team_name(home if home_is_winner else away, NAME_W) if wid else ""
-                arrow = f"  [bold cyan]──► {winner_name}[/bold cyan]" if winner_name else ""
+                is_final = _round_key(round_name) == 0
+                trophy = "🏆 " if is_final else ""
+                arrow = f"  [bold cyan]──► {trophy}{winner_name}[/bold cyan]" if winner_name else ""
                 lines.append(f"  {h}  {score}  {a}{arrow}")
             elif state == "in":
                 clock = ev.get("status", {}).get("displayClock", "")
