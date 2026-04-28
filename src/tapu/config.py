@@ -17,6 +17,7 @@ class League:
     color: str = "#ffffff"
     matchday_label: str = "Week"
     relegation_spots: int = 0
+    promotion_spots: int = 0
     flag: str = ""
     related: tuple[RelatedTournament, ...] = ()
 

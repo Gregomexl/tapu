@@ -189,7 +189,7 @@ class LeagueScreen(Screen):
         try:
             standings = await self.client.get_standings(self.league.slug)
             await pane.remove_children()
-            await pane.mount(StandingsTable(standings, self.league.relegation_spots))
+            await pane.mount(StandingsTable(standings, self.league.relegation_spots, self.league.promotion_spots))
         except Exception:
             await pane.remove_children()
             await pane.mount(Static("[red]Standings unavailable[/red]"))

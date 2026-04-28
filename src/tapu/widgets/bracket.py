@@ -23,11 +23,9 @@ _SLUG_DISPLAY: dict[str, str] = {
 
 def _round_key(headline: str) -> int:
     h = headline.lower().strip()
-    # exact ESPN slug matches first
     _exact = {"final": 0, "semifinals": 1, "quarterfinals": 2, "round-of-16": 3, "round-of-32": 4}
     if h in _exact:
         return _exact[h]
-    # headline substring fallback
     if h.startswith("final") and "semifinal" not in h and "quarterfinal" not in h:
         return 0
     if "semifinal" in h or "semi-final" in h:
@@ -70,17 +68,8 @@ def _winner_id(event: dict) -> str | None:
     return str(winner["team"]["id"]) if winner else None
 
 
-def _fmt_team(comp: dict, width: int = 10) -> str:
-    name = (comp["team"].get("shortDisplayName") or comp["team"].get("abbreviation", "?"))[:width]
-    score = comp.get("score") or "-"
-    return f"{name:<{width}} {score:>2}"
-
-
-def _get_competitors(event: dict) -> tuple[dict, dict]:
-    comps = event["competitions"][0]["competitors"]
-    home = next((c for c in comps if c["homeAway"] == "home"), comps[0])
-    away = next((c for c in comps if c["homeAway"] == "away"), comps[min(1, len(comps) - 1)])
-    return home, away
+def _team_name(comp: dict, width: int = 16) -> str:
+    return (comp["team"].get("shortDisplayName") or comp["team"].get("abbreviation", "?"))[:width]
 
 
 def _bracket_lines(events: list[dict]) -> list[str]:
@@ -95,108 +84,61 @@ def _bracket_lines(events: list[dict]) -> list[str]:
     if not by_round:
         return ["[dim]Bracket not yet available[/dim]"]
 
-    sorted_rounds = sorted(by_round.items(), key=lambda x: _round_key(x[0]))
-
-    qf_evs: list[dict] = []
-    sf_evs: list[dict] = []
-    final_evs: list[dict] = []
-    for name, evs in sorted_rounds:
-        k = _round_key(name)
-        if k == 2:
-            qf_evs = evs
-        elif k == 1:
-            sf_evs = evs
-        elif k == 0:
-            final_evs = evs
-
-    if not sf_evs and not final_evs:
+    has_knockout = any(_round_key(r) < 99 for r in by_round)
+    if not has_knockout:
         return ["[dim]Bracket not yet available[/dim]"]
 
-    N = 10
-    gap = " " * (N + 3)
+    sorted_rounds = sorted(by_round.items(), key=lambda x: _round_key(x[0]), reverse=True)
 
-    qf_by_winner: dict[str, dict] = {}
-    for ev in qf_evs:
-        wid = _winner_id(ev)
-        if wid:
-            qf_by_winner[wid] = ev
-
-    def null_team(width: int = N) -> str:
-        return f"{'?':<{width}}  -"
-
+    NAME_W = 16
     lines: list[str] = []
 
-    if qf_evs:
-        lines.append(f"  {'QUARTERFINALS':<{N + 3}}  SEMIFINALS")
-    else:
-        lines.append("  SEMIFINALS")
-    lines.append("")
-
-    for sf_ev in sf_evs:
-        sf_home, sf_away = _get_competitors(sf_ev)
-        home_id = str(sf_home["team"]["id"])
-        away_id = str(sf_away["team"]["id"])
-
-        qf_for_home = qf_by_winner.get(home_id)
-        qf_for_away = qf_by_winner.get(away_id)
-
-        if qf_for_home:
-            qh, qa = _get_competitors(qf_for_home)
-            lines.append(f"  {_fmt_team(qh, N)} ─┐")
-            lines.append(f"  {gap}  ├─ {_fmt_team(sf_home, N)}")
-            lines.append(f"  {_fmt_team(qa, N)} ─┘")
-        else:
-            lines.append(f"  {null_team(N)} ─┐")
-            lines.append(f"  {gap}  ├─ {_fmt_team(sf_home, N)}")
-            lines.append(f"  {null_team(N)} ─┘")
-
+    for round_name, round_evs in sorted_rounds:
+        sep = "─" * max(0, 40 - len(round_name) - 4)
+        lines.append(f"[bold cyan]── {round_name.upper()} {sep}[/bold cyan]")
         lines.append("")
 
-        if qf_for_away:
-            qh, qa = _get_competitors(qf_for_away)
-            lines.append(f"  {_fmt_team(qh, N)} ─┐")
-            lines.append(f"  {gap}  ├─ {_fmt_team(sf_away, N)}")
-            lines.append(f"  {_fmt_team(qa, N)} ─┘")
-        else:
-            lines.append(f"  {null_team(N)} ─┐")
-            lines.append(f"  {gap}  ├─ {_fmt_team(sf_away, N)}")
-            lines.append(f"  {null_team(N)} ─┘")
+        for ev in round_evs:
+            comps = ev["competitions"][0]["competitors"]
+            home = next((c for c in comps if c["homeAway"] == "home"), comps[0])
+            away = next((c for c in comps if c["homeAway"] == "away"), comps[min(1, len(comps) - 1)])
+
+            home_name = _team_name(home, NAME_W)
+            away_name = _team_name(away, NAME_W)
+            home_score = home.get("score") or "-"
+            away_score = away.get("score") or "-"
+            state = ev.get("status", {}).get("type", {}).get("state", "pre")
+            wid = _winner_id(ev)
+
+            if state == "post":
+                home_is_winner = wid == str(home["team"]["id"])
+                away_is_winner = wid == str(away["team"]["id"])
+                h = f"[bold cyan]{home_name}[/bold cyan]" if home_is_winner else f"[dim]{home_name}[/dim]"
+                a = f"[bold cyan]{away_name}[/bold cyan]" if away_is_winner else f"[dim]{away_name}[/dim]"
+                score = f"[bold]{home_score}[/bold] [dim]–[/dim] [bold]{away_score}[/bold]"
+                winner_name = _team_name(home if home_is_winner else away, NAME_W) if wid else ""
+                arrow = f"  [bold cyan]──► {winner_name}[/bold cyan]" if winner_name else ""
+                lines.append(f"  {h}  {score}  {a}{arrow}")
+            elif state == "in":
+                clock = ev.get("status", {}).get("displayClock", "")
+                score = f"[bold green]{home_score}[/bold green] [green]●[/green] [bold green]{away_score}[/bold green]"
+                time_str = f"[green]{clock}[/green]" if clock else "[green]LIVE[/green]"
+                lines.append(f"  [bold]{home_name}[/bold]  {score}  [bold]{away_name}[/bold]  {time_str}")
+            else:
+                date_str = ev.get("date", "")
+                if date_str:
+                    try:
+                        from datetime import datetime
+                        dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+                        time_label = dt.astimezone().strftime("%b %-d")
+                    except Exception:
+                        time_label = ""
+                else:
+                    time_label = ""
+                detail = f"  [dim]{time_label}[/dim]" if time_label else ""
+                lines.append(f"  [dim]{home_name}[/dim]  [dim]vs[/dim]  [dim]{away_name}[/dim]{detail}")
 
         lines.append("")
-
-    lines.append("  " + "─" * 30)
-    lines.append("  FINAL")
-    lines.append("")
-
-    if final_evs:
-        fin_home, fin_away = _get_competitors(final_evs[0])
-        state = final_evs[0].get("status", {}).get("type", {}).get("state", "pre")
-        if state == "post":
-            lines.append(f"  {_fmt_team(fin_home, N)}  –  {_fmt_team(fin_away, N)}")
-        elif state == "in":
-            lines.append(
-                f"  {_fmt_team(fin_home, N)}  [green]LIVE[/green]  {_fmt_team(fin_away, N)}"
-            )
-        else:
-            h_name = (fin_home["team"].get("shortDisplayName") or fin_home["team"].get("abbreviation", "?"))[:N]
-            a_name = (fin_away["team"].get("shortDisplayName") or fin_away["team"].get("abbreviation", "?"))[:N]
-            lines.append(f"  {h_name:<{N}}  vs  {a_name:<{N}}")
-    else:
-        finalists: list[str] = []
-        for sf_ev in sf_evs:
-            wid = _winner_id(sf_ev)
-            if wid:
-                sf_home, sf_away = _get_competitors(sf_ev)
-                comp = sf_home if str(sf_home["team"]["id"]) == wid else sf_away
-                finalists.append(
-                    (comp["team"].get("shortDisplayName") or comp["team"].get("abbreviation", "?"))[:N]
-                )
-        if len(finalists) >= 2:
-            lines.append(f"  {finalists[0]:<{N}}  vs  {finalists[1]:<{N}}")
-        elif len(finalists) == 1:
-            lines.append(f"  {finalists[0]:<{N}}  vs  [dim]TBD[/dim]")
-        else:
-            lines.append("  [dim]TBD[/dim]")
 
     return lines
 

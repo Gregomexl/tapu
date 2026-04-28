@@ -13,18 +13,26 @@ def _stat(stats: list[dict], name: str) -> str:
     return "-"
 
 
-def _fill_table(table: DataTable, entries: list[dict], relegation_spots: int = 0) -> None:
+def _fill_table(
+    table: DataTable,
+    entries: list[dict],
+    relegation_spots: int = 0,
+    promotion_spots: int = 0,
+) -> None:
     table.add_columns("#", "Team", "P", "W", "D", "L", "GD", "Pts")
     total = len(entries)
     for i, entry in enumerate(entries, 1):
         team = entry["team"].get("shortDisplayName") or entry["team"]["abbreviation"]
         stats = entry.get("stats", [])
         relegated = relegation_spots > 0 and i > total - relegation_spots
+        promoted = promotion_spots > 0 and i <= promotion_spots
 
-        def cell(s: str, r: bool = relegated) -> Text:
-            t = Text(s)
+        def cell(s: str, r: bool = relegated, p: bool = promoted) -> Text:
+            t = Text(s, justify="right")
             if r:
                 t.stylize("bold red")
+            elif p:
+                t.stylize("bold green")
             return t
 
         table.add_row(
@@ -46,7 +54,7 @@ class StandingsTable(Widget):
     }
     StandingsTable DataTable {
         height: auto;
-        max-height: 24;
+        max-height: 28;
         margin: 0 0 1 0;
     }
     StandingsTable Label {
@@ -56,10 +64,16 @@ class StandingsTable(Widget):
     }
     """
 
-    def __init__(self, data: dict[str, Any], relegation_spots: int = 0) -> None:
+    def __init__(
+        self,
+        data: dict[str, Any],
+        relegation_spots: int = 0,
+        promotion_spots: int = 0,
+    ) -> None:
         super().__init__()
         self._data = data
         self._relegation_spots = relegation_spots
+        self._promotion_spots = promotion_spots
 
     def compose(self) -> ComposeResult:
         children = self._data.get("children", [])
@@ -70,12 +84,24 @@ class StandingsTable(Widget):
                 if not entries:
                     continue
                 yield Label(group_name)
-                table = DataTable()
-                _fill_table(table, entries, self._relegation_spots)
+                table = self._make_table()
+                _fill_table(table, entries, self._relegation_spots, self._promotion_spots)
                 yield table
         else:
             standings = children[0].get("standings", {}) if children else self._data.get("standings", {})
             entries = standings.get("entries", [])
-            table = DataTable()
-            _fill_table(table, entries, self._relegation_spots)
+            table = self._make_table()
+            _fill_table(table, entries, self._relegation_spots, self._promotion_spots)
             yield table
+
+    @property
+    def row_count(self) -> int:
+        tables = list(self.query(DataTable))
+        return sum(t.row_count for t in tables)
+
+    def _make_table(self) -> DataTable:
+        table: DataTable = DataTable()
+        table.zebra_stripes = True
+        table.cursor_type = "row"
+        table.show_cursor = False
+        return table
