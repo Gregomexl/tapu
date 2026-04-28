@@ -57,11 +57,20 @@ class MatchCard(Widget, can_focus=True):
         margin: 0 0 1 0;
         border: solid $surface-lighten-2;
     }
+    MatchCard:hover {
+        background: $surface-lighten-1;
+    }
     MatchCard:focus {
         border: solid $primary;
+        background: $surface-lighten-2;
     }
     MatchCard.live {
         border: solid $success;
+        background: $surface-darken-1;
+    }
+    MatchCard.live:focus {
+        border: solid $success;
+        background: $surface-lighten-2;
     }
     """
 
