@@ -13,6 +13,28 @@ def _stat(stats: list[dict], name: str) -> str:
     return "-"
 
 
+def _row_style(
+    rank: int,
+    total: int,
+    note: dict | None,
+    relegation_spots: int,
+    promotion_spots: int,
+) -> str | None:
+    """Return a Rich style string for this row, or None for default."""
+    if note:
+        desc = note.get("description", "").lower()
+        if "relegat" in desc:
+            return "bold red"
+        # Any competition zone (CL, EL, Conference, Promotion, Liguilla…)
+        return "bold green"
+    # Static fallback
+    if relegation_spots > 0 and rank > total - relegation_spots:
+        return "bold red"
+    if promotion_spots > 0 and rank <= promotion_spots:
+        return "bold green"
+    return None
+
+
 def _fill_table(
     table: DataTable,
     entries: list[dict],
@@ -22,28 +44,27 @@ def _fill_table(
     table.add_columns("#", "Team", "P", "W", "D", "L", "GD", "Pts")
     total = len(entries)
     for i, entry in enumerate(entries, 1):
+        stats = {s["name"]: s for s in entry.get("stats", [])}
+        rank = int(stats.get("rank", {}).get("value", i))
         team = entry["team"].get("shortDisplayName") or entry["team"]["abbreviation"]
-        stats = entry.get("stats", [])
-        relegated = relegation_spots > 0 and i > total - relegation_spots
-        promoted = promotion_spots > 0 and i <= promotion_spots
+        note = entry.get("note")
+        style = _row_style(rank, total, note, relegation_spots, promotion_spots)
 
-        def cell(s: str, r: bool = relegated, p: bool = promoted) -> Text:
+        def cell(s: str, st: str | None = style) -> Text:
             t = Text(s, justify="right")
-            if r:
-                t.stylize("bold red")
-            elif p:
-                t.stylize("bold green")
+            if st:
+                t.stylize(st)
             return t
 
         table.add_row(
-            cell(str(i)),
+            cell(str(rank)),
             cell(team),
-            cell(_stat(stats, "gamesPlayed")),
-            cell(_stat(stats, "wins")),
-            cell(_stat(stats, "ties")),
-            cell(_stat(stats, "losses")),
-            cell(_stat(stats, "pointDifferential")),
-            cell(_stat(stats, "points")),
+            cell(_stat(entry.get("stats", []), "gamesPlayed")),
+            cell(_stat(entry.get("stats", []), "wins")),
+            cell(_stat(entry.get("stats", []), "ties")),
+            cell(_stat(entry.get("stats", []), "losses")),
+            cell(_stat(entry.get("stats", []), "pointDifferential")),
+            cell(_stat(entry.get("stats", []), "points")),
         )
 
 
@@ -75,6 +96,10 @@ class StandingsTable(Widget):
         self._relegation_spots = relegation_spots
         self._promotion_spots = promotion_spots
 
+    @property
+    def row_count(self) -> int:
+        return sum(t.row_count for t in self.query(DataTable))
+
     def compose(self) -> ComposeResult:
         children = self._data.get("children", [])
         if len(children) > 1:
@@ -93,11 +118,6 @@ class StandingsTable(Widget):
             table = self._make_table()
             _fill_table(table, entries, self._relegation_spots, self._promotion_spots)
             yield table
-
-    @property
-    def row_count(self) -> int:
-        tables = list(self.query(DataTable))
-        return sum(t.row_count for t in tables)
 
     def _make_table(self) -> DataTable:
         table: DataTable = DataTable()
