@@ -54,6 +54,8 @@ name = "Liga MX"
 full_name = "Liga MX"
 color = "#006847"
 matchday_label = "Week"
+relegation_spots = 0
+promotion_spots = 12
 flag = "🇲🇽"
 
 [[leagues]]
@@ -63,6 +65,7 @@ full_name = "Liga Profesional"
 color = "#74acdf"
 matchday_label = "Fecha"
 relegation_spots = 3
+promotion_spots = 8
 flag = "🇦🇷"
 related = [
   {name = "Copa Argentina", slug = "arg.copa"},
