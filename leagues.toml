@@ -22,6 +22,10 @@ color = "#3d0068"
 matchday_label = "Matchweek"
 relegation_spots = 3
 flag = "🏴󠁧󠁢󠁥󠁮󠁧󠁿"
+related = [
+  {name = "FA Cup",      slug = "eng.fa"},
+  {name = "Carabao Cup", slug = "eng.league_cup"},
+]
 
 [[leagues]]
 slug = "esp.1"
@@ -31,6 +35,10 @@ color = "#ee8707"
 matchday_label = "Matchday"
 relegation_spots = 3
 flag = "🇪🇸"
+related = [
+  {name = "Copa del Rey", slug = "esp.copa_del_rey"},
+  {name = "Supercopa",    slug = "esp.super_cup"},
+]
 
 [[leagues]]
 slug = "fifa.world"
@@ -51,11 +59,14 @@ flag = "🇲🇽"
 [[leagues]]
 slug = "arg.1"
 name = "Liga Prof"
-full_name = "Liga Profesional de Fútbol"
+full_name = "Liga Profesional"
 color = "#74acdf"
 matchday_label = "Fecha"
 relegation_spots = 3
 flag = "🇦🇷"
+related = [
+  {name = "Copa Argentina", slug = "arg.copa"},
+]
 
 [[leagues]]
 slug = "ger.1"
@@ -65,6 +76,9 @@ color = "#d20515"
 matchday_label = "Matchday"
 relegation_spots = 3
 flag = "🇩🇪"
+related = [
+  {name = "DFB-Pokal", slug = "ger.dfb_pokal"},
+]
 
 [[leagues]]
 slug = "fra.1"
@@ -74,3 +88,6 @@ color = "#0a2d6e"
 matchday_label = "Matchday"
 relegation_spots = 3
 flag = "🇫🇷"
+related = [
+  {name = "Coupe de France", slug = "fra.coupe_de_france"},
+]
