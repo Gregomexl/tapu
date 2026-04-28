@@ -7,7 +7,7 @@ from textual.binding import Binding, BindingType
 from textual.containers import ItemGrid, VerticalScroll
 from textual.screen import Screen
 from textual.timer import Timer
-from textual.widgets import Footer, Header, Static
+from textual.widgets import Footer, Header, LoadingIndicator, Static
 
 from tapu.api import ESPNClient
 from tapu.config import League
@@ -42,6 +42,11 @@ class DashboardScreen(Screen):
         height: auto;
         padding: 1;
     }
+    DashboardScreen LoadingIndicator {
+        height: 3;
+        background: transparent;
+        color: $success;
+    }
     """
 
     SPLASH = (
@@ -66,6 +71,7 @@ class DashboardScreen(Screen):
         yield Header()
         with VerticalScroll():
             yield Static(self.SPLASH, classes="splash")
+            yield LoadingIndicator(id="loader")
             yield ItemGrid(id="cards-grid", classes="cards-grid", min_column_width=40)
         yield Footer()
 
@@ -78,10 +84,15 @@ class DashboardScreen(Screen):
 
     @work(exit_on_error=False)
     async def _bg_refresh(self) -> None:
-        await self._load_all()
+        await self._load_all(show_loader=False)
 
-    async def _load_all(self) -> None:
-        # Fetch all scoreboards concurrently, tolerating individual failures
+    async def _load_all(self, show_loader: bool = True) -> None:
+        loader = self.query_one("#loader", LoadingIndicator)
+        grid = self.query_one("#cards-grid", ItemGrid)
+
+        if show_loader:
+            loader.display = True
+
         results = await asyncio.gather(
             *[self.client.get_scoreboard(l.slug) for l in self.leagues],
             return_exceptions=True,
@@ -90,8 +101,8 @@ class DashboardScreen(Screen):
             if not isinstance(result, Exception):
                 self._scoreboards[league.slug] = result
 
-        # Render all cards in one sequential pass — no race conditions
-        grid = self.query_one("#cards-grid", ItemGrid)
+        loader.display = False
+
         await grid.remove_children()
         for league in self.leagues:
             card_id = f"card-{league.slug.replace('.', '-')}"

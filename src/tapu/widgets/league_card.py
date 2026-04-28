@@ -24,11 +24,19 @@ class LeagueCard(Widget, can_focus=True):
         margin: 0 1 1 0;
         border: solid $surface-lighten-2;
     }
+    LeagueCard:hover {
+        background: $surface-lighten-1;
+    }
     LeagueCard:focus {
         border: solid $primary;
+        background: $surface-lighten-2;
     }
     LeagueCard.has-live {
         border: solid $success;
+    }
+    LeagueCard.has-live:focus {
+        border: solid $success;
+        background: $surface-lighten-2;
     }
     """
 
@@ -53,32 +61,25 @@ class LeagueCard(Widget, can_focus=True):
 
     def compose(self) -> ComposeResult:
         events = self.scoreboard.get("events", [])
-        live_label = (
-            f"[bold green]{self.live_count} live[/bold green]"
-            if self.live_count > 0
-            else f"[dim]{len(events)} matches[/dim]"
-        )
-        top_match = ""
-        if events:
-            e = events[0]
-            comps = e["competitions"][0]["competitors"]
-            home = next(c for c in comps if c["homeAway"] == "home")
-            away = next(c for c in comps if c["homeAway"] == "away")
-            top_match = (
-                f"{home['team']['abbreviation']} "
-                f"{home.get('score', '-')}-{away.get('score', '-')} "
-                f"{away['team']['abbreviation']}"
-            )
+        total = len(events)
+        if self.live_count > 0:
+            match_label = f"[bold green]{self.live_count} live[/bold green][dim] · {total} today[/dim]"
+        elif total > 0:
+            match_label = f"[dim]{total} matches today[/dim]"
+        else:
+            match_label = "[dim]No matches today[/dim]"
 
         flag = f"{self.league.flag}  " if self.league.flag else ""
-        yield Static(f"{flag}[bold]{self.league.name}[/bold]  {live_label}")
-        yield Static(f"[dim]{self.league.full_name}[/dim]")
-        yield Static(top_match or "[dim]No matches today[/dim]")
+        yield Static(f"{flag}[bold]{self.league.full_name}[/bold]")
+        yield Static(match_label)
 
     def on_mount(self) -> None:
         self.styles.border_left = ("thick", self.league.color)
 
     def action_select(self) -> None:
+        self.post_message(self.Selected(self.league))
+
+    def on_click(self) -> None:
         self.post_message(self.Selected(self.league))
 
     class Selected(Message):

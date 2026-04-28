@@ -17,7 +17,7 @@ def sample_scoreboard():
                 "name": "Real Madrid vs Barcelona",
                 "shortName": "RMA vs BAR",
                 "status": {
-                    "type": {"name": "STATUS_IN_PROGRESS"},
+                    "type": {"name": "STATUS_IN_PROGRESS", "state": "in"},
                     "displayClock": "67:00",
                 },
                 "competitions": [

@@ -23,13 +23,13 @@ def _row_style(
     """Return a Rich style string for this row, or None for default."""
     if note:
         desc = note.get("description", "").lower()
-        if "relegat" in desc:
+        if "relegat" in desc or "eliminat" in desc:
             return "bold red"
-        if "champion" in desc:
+        if "champion" in desc or "advance" in desc or "round of" in desc:
             return "bold cyan"
-        if "europa" in desc:
+        if "europa" in desc or "sudamericana" in desc:
             return "bold green"
-        if "conference" in desc:
+        if "conference" in desc or "best" in desc:
             return "bold yellow"
         # Generic competition zone (liguilla, promotion, etc.)
         return "bold green"

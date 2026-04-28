@@ -15,6 +15,7 @@ from tapu.config import League, RelatedTournament
 from tapu.widgets.bracket import BracketWidget, _event_round, _round_key
 from tapu.widgets.match_card import MatchCard
 from tapu.widgets.standings import StandingsTable
+from tapu.widgets.wc_groups import GroupCard, WCGroupsWidget
 
 
 def _date_to_api(d: date) -> str:
@@ -113,13 +114,28 @@ class LeagueScreen(Screen):
         yield Header()
         with TabbedContent():
             with TabPane(self.league.full_name, id="tab-main"):
-                with Horizontal(classes="main-row"):
+                if self.league.is_tournament:
+                    # Full-width groups grid — no matches/standings split
                     yield VerticalScroll(
                         Static("[dim]Loading...[/dim]", classes="no-matches"),
-                        id="matches-pane",
+                        id="standings-pane",
                         classes="matches-col",
                     )
-                    yield VerticalScroll(id="standings-pane", classes="standings-col")
+                else:
+                    with Horizontal(classes="main-row"):
+                        yield VerticalScroll(
+                            Static("[dim]Loading...[/dim]", classes="no-matches"),
+                            id="matches-pane",
+                            classes="matches-col",
+                        )
+                        yield VerticalScroll(id="standings-pane", classes="standings-col")
+            if self.league.is_tournament or self.league.has_bracket:
+                with TabPane("Bracket", id="tab-bracket"):
+                    yield VerticalScroll(
+                        Static("[dim]Loading...[/dim]", classes="no-matches"),
+                        id="bracket-pane",
+                        classes="matches-col",
+                    )
             for related in self.league.related:
                 tab_id = f"tab-{related.slug.replace('.', '-')}"
                 with TabPane(related.name, id=tab_id):
@@ -134,12 +150,14 @@ class LeagueScreen(Screen):
 
     def on_mount(self) -> None:
         self.sub_title = self.league.full_name
-        self.run_worker(self._load_matches())
+        if not self.league.is_tournament:
+            self.run_worker(self._load_matches())
         self.run_worker(self._load_standings())
         self._refresh_timer = self.set_interval(60, self._tick_refresh)
 
     def _tick_refresh(self) -> None:
-        self._bg_refresh()
+        if not self.league.is_tournament:
+            self._bg_refresh()
 
     @work(exit_on_error=False)
     async def _bg_refresh(self) -> None:
@@ -189,7 +207,11 @@ class LeagueScreen(Screen):
         try:
             standings = await self.client.get_standings(self.league.slug)
             await pane.remove_children()
-            await pane.mount(StandingsTable(standings, self.league.relegation_spots, self.league.promotion_spots))
+            children = standings.get("children", [])
+            if self.league.is_tournament and len(children) > 4:
+                await pane.mount(WCGroupsWidget(standings))
+            else:
+                await pane.mount(StandingsTable(standings, self.league.relegation_spots, self.league.promotion_spots))
         except Exception:
             await pane.remove_children()
             await pane.mount(Static("[red]Standings unavailable[/red]"))
@@ -199,10 +221,37 @@ class LeagueScreen(Screen):
         if not pane_id or pane_id == "tab-main" or pane_id in self._loaded_tabs:
             return
         self._loaded_tabs.add(pane_id)
+        if pane_id == "tab-bracket" and (self.league.is_tournament or self.league.has_bracket):
+            self._load_league_bracket()
+            return
         for related in self.league.related:
             if f"tab-{related.slug.replace('.', '-')}" == pane_id:
                 self._load_tournament(related)
                 break
+
+    @work(exit_on_error=False)
+    async def _load_league_bracket(self) -> None:
+        pane = self.query_one("#bracket-pane", VerticalScroll)
+        try:
+            if self.league.has_bracket:
+                # Calendar-year range avoids hitting ESPN's 100-event cap on league/group phase
+                data = await self.client.get_knockout_events(self.league.slug)
+            else:
+                data = await self.client.get_tournament_events(self.league.slug)
+            events = data.get("events", [])
+            # Bracket tab: known knockout rounds only (keys 0–9); exclude group stage (100+) and unrecognised (99)
+            knockout = [ev for ev in events if _round_key(_event_round(ev)) <= 9]
+            await pane.remove_children()
+            await pane.mount(BracketWidget(knockout))
+        except Exception:
+            await pane.remove_children()
+            await pane.mount(Static("[red]Failed to load bracket[/red]", classes="no-matches"))
+
+    def on_group_card_selected(self, message: GroupCard.Selected) -> None:
+        from tapu.screens.wc_group import WCGroupScreen
+        self.app.push_screen(
+            WCGroupScreen(self.client, self.league, message.group_name, message.child_data)
+        )
 
     @work(exit_on_error=False)
     async def _load_tournament(self, related: RelatedTournament) -> None:
@@ -210,13 +259,13 @@ class LeagueScreen(Screen):
         matches_pane = self.query_one(f"#matches-{tab_id}", VerticalScroll)
         bracket_pane = self.query_one(f"#bracket-{tab_id}", VerticalScroll)
         try:
-            data = await self.client.get_tournament_events(related.slug)
+            data = await self.client.get_knockout_events(related.slug)
             events = data.get("events", [])
             await matches_pane.remove_children()
             if not events:
                 await matches_pane.mount(Static("[dim]No matches[/dim]", classes="no-matches"))
             else:
-                rounds = _group_events_by_round(events)[:3]
+                rounds = _group_events_by_round(events)
                 for round_name, round_evs in rounds:
                     await matches_pane.mount(Static(round_name, classes="section-header"))
                     for ev in round_evs:
@@ -231,9 +280,15 @@ class LeagueScreen(Screen):
         self.client.clear_cache()
         active = self.query_one(TabbedContent).active
         if active == "tab-main" or not active:
-            self._positions.clear()
-            self.run_worker(self._load_matches())
-            self.run_worker(self._load_standings())
+            if self.league.is_tournament:
+                self.run_worker(self._load_standings())
+            else:
+                self._positions.clear()
+                self.run_worker(self._load_matches())
+                self.run_worker(self._load_standings())
+        elif active == "tab-bracket":
+            self._loaded_tabs.discard(active)
+            self._load_league_bracket()
         else:
             self._loaded_tabs.discard(active)
             for related in self.league.related:

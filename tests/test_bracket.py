@@ -65,6 +65,13 @@ def test_round_key_unknown_is_99():
     assert _round_key("Group Stage") == 99
 
 
+def test_round_key_group_names():
+    assert _round_key("Group A") == 100
+    assert _round_key("Group B") == 101
+    assert _round_key("Group L") == 111
+    assert _round_key("group a") == 100
+
+
 # ── _event_round ──────────────────────────────────────────────────────────────
 
 def test_event_round_extracts_headline():

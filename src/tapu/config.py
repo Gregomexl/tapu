@@ -18,6 +18,8 @@ class League:
     matchday_label: str = "Week"
     relegation_spots: int = 0
     promotion_spots: int = 0
+    is_tournament: bool = False
+    has_bracket: bool = False
     flag: str = ""
     related: tuple[RelatedTournament, ...] = ()
 

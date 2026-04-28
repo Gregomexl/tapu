@@ -7,3 +7,12 @@ dist/
 .ruff_cache/
 .coverage
 .superpowers/
+
+# OS
+.DS_Store
+
+# App disk cache
+.cache/
+
+# Example / scratch images
+example_images/

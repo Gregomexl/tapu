@@ -4,6 +4,7 @@ name = "UCL"
 full_name = "UEFA Champions League"
 color = "#1a56db"
 matchday_label = "Matchday"
+has_bracket = true
 flag = "🇪🇺"
 
 [[leagues]]
@@ -12,6 +13,7 @@ name = "UEL"
 full_name = "UEFA Europa League"
 color = "#f05a28"
 matchday_label = "Matchday"
+has_bracket = true
 flag = "🇪🇺"
 
 [[leagues]]
@@ -46,6 +48,7 @@ name = "FIFA WC"
 full_name = "FIFA World Cup"
 color = "#c8a84b"
 matchday_label = "Matchday"
+is_tournament = true
 flag = "🌍"
 
 [[leagues]]
@@ -56,6 +59,7 @@ color = "#006847"
 matchday_label = "Week"
 relegation_spots = 0
 promotion_spots = 8
+has_bracket = true
 flag = "🇲🇽"
 
 [[leagues]]
@@ -94,3 +98,25 @@ flag = "🇫🇷"
 related = [
   {name = "Coupe de France", slug = "fra.coupe_de_france"},
 ]
+
+[[leagues]]
+slug = "ita.1"
+name = "Serie A"
+full_name = "Serie A"
+color = "#003399"
+matchday_label = "Matchday"
+relegation_spots = 3
+flag = "🇮🇹"
+related = [
+  {name = "Coppa Italia", slug = "ita.coppa_italia"},
+]
+
+[[leagues]]
+slug = "conmebol.libertadores"
+name = "Libertadores"
+full_name = "Copa Libertadores"
+color = "#ffd700"
+matchday_label = "Matchday"
+promotion_spots = 2
+has_bracket = true
+flag = "🌎"

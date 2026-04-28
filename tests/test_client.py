@@ -17,7 +17,8 @@ def _mock_response(data):
 
 @pytest.mark.asyncio
 async def test_get_scoreboard_calls_correct_url(client, sample_scoreboard):
-    with patch.object(client._http, "get", new_callable=AsyncMock) as mock_get:
+    with patch.object(client._http, "get", new_callable=AsyncMock) as mock_get, \
+         patch.object(client, "_read_disk", return_value=None):
         mock_get.return_value = _mock_response(sample_scoreboard)
 
         result = await client.get_scoreboard("eng.1")
@@ -31,18 +32,20 @@ async def test_get_scoreboard_calls_correct_url(client, sample_scoreboard):
 
 @pytest.mark.asyncio
 async def test_get_scoreboard_uses_cache(client, sample_scoreboard):
-    with patch.object(client._http, "get", new_callable=AsyncMock) as mock_get:
+    with patch.object(client._http, "get", new_callable=AsyncMock) as mock_get, \
+         patch.object(client, "_read_disk", return_value=None):
         mock_get.return_value = _mock_response(sample_scoreboard)
 
         await client.get_scoreboard("eng.1")
         await client.get_scoreboard("eng.1")
 
-        assert mock_get.call_count == 1  # second call served from cache
+        assert mock_get.call_count == 1  # second call served from in-memory cache
 
 
 @pytest.mark.asyncio
 async def test_get_standings_calls_correct_url(client, sample_standings):
-    with patch.object(client._http, "get", new_callable=AsyncMock) as mock_get:
+    with patch.object(client._http, "get", new_callable=AsyncMock) as mock_get, \
+         patch.object(client, "_read_disk", return_value=None):
         mock_get.return_value = _mock_response(sample_standings)
 
         result = await client.get_standings("esp.1")
@@ -69,7 +72,8 @@ async def test_get_match_summary_calls_correct_url(client):
 
 @pytest.mark.asyncio
 async def test_clear_cache(client, sample_scoreboard):
-    with patch.object(client._http, "get", new_callable=AsyncMock) as mock_get:
+    with patch.object(client._http, "get", new_callable=AsyncMock) as mock_get, \
+         patch.object(client, "_read_disk", return_value=None):
         mock_get.return_value = _mock_response(sample_scoreboard)
 
         await client.get_scoreboard("eng.1")

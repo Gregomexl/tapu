@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any
 
 import httpx
+from json import JSONDecodeError
 
 BASE_URL = "https://site.api.espn.com/apis/site/v2/sports/soccer"
 STANDINGS_URL = "https://site.web.api.espn.com/apis/v2/sports/soccer"
@@ -64,7 +65,13 @@ class ESPNClient:
 
         response = await self._http.get(url)
         response.raise_for_status()
-        data = response.json()
+        try:
+            data = response.json()
+        except JSONDecodeError:
+            # ESPN occasionally returns a schema template instead of data — retry once
+            response = await self._http.get(url)
+            response.raise_for_status()
+            data = response.json()
         self._cache[url] = (datetime.now().timestamp(), data)
         if disk_ttl is not None:
             self._write_disk(url, data)
@@ -74,7 +81,6 @@ class ESPNClient:
         return await self._get(
             f"{BASE_URL}/{slug}/scoreboard",
             cache_ttl=3.0,
-            disk_ttl=300.0,  # 5 min disk cache for dashboard startup
         )
 
     async def get_standings(self, slug: str) -> dict[str, Any]:
@@ -89,6 +95,13 @@ class ESPNClient:
             cache_ttl=300.0,
             disk_ttl=3600.0,
         )
+
+    async def get_knockout_events(self, slug: str) -> dict[str, Any]:
+        """Fetch current calendar year — captures knockout rounds without being swamped by league/group phase."""
+        today = datetime.now()
+        start = today.replace(month=1, day=1).strftime("%Y%m%d")
+        end = today.replace(month=12, day=31).strftime("%Y%m%d")
+        return await self.get_scoreboard_daterange(slug, start, end)
 
     async def get_tournament_events(self, slug: str) -> dict[str, Any]:
         today = datetime.now()
