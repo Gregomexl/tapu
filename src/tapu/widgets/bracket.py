@@ -5,48 +5,69 @@ from textual.widget import Widget
 from textual.widgets import Static
 
 
-ROUND_PRIORITY: list[tuple[int, list[str]]] = [
-    (0, ["final"]),
-    (1, ["semifinal", "semi-final", "semifinales"]),
-    (2, ["quarterfinal", "quarter-final", "cuartos"]),
-    (3, ["round of 16", "ronda de 16"]),
-    (4, ["round of 32"]),
-    (5, ["round of 64"]),
-]
+_SLUG_DISPLAY: dict[str, str] = {
+    "final": "Final",
+    "semifinals": "Semifinals",
+    "quarterfinals": "Quarterfinals",
+    "round-of-16": "Round of 16",
+    "round-of-32": "Round of 32",
+    "fifth-round": "Fifth Round",
+    "fourth-round": "Fourth Round",
+    "third-round": "Third Round",
+    "second-round": "Second Round",
+    "first-round": "First Round",
+    "qualifying-round": "Qualifying Round",
+    "preliminary-round": "Preliminary Round",
+}
 
 
 def _round_key(headline: str) -> int:
     h = headline.lower().strip()
-    if h in ("final",) or (h.startswith("final ") and "semifinal" not in h):
+    # exact ESPN slug matches first
+    _exact = {"final": 0, "semifinals": 1, "quarterfinals": 2, "round-of-16": 3, "round-of-32": 4}
+    if h in _exact:
+        return _exact[h]
+    # headline substring fallback
+    if h.startswith("final") and "semifinal" not in h and "quarterfinal" not in h:
         return 0
-    if "semifinal" in h or "semi-final" in h or "semifinales" in h:
+    if "semifinal" in h or "semi-final" in h:
         return 1
-    if "quarterfinal" in h or "quarter-final" in h or "cuartos" in h:
+    if "quarterfinal" in h or "quarter-final" in h:
         return 2
-    if "round of 16" in h or "ronda de 16" in h:
+    if "round of 16" in h:
         return 3
     if "round of 32" in h:
         return 4
-    if "round of 64" in h:
+    if "fifth" in h:
         return 5
+    if "fourth" in h:
+        return 6
+    if "third" in h:
+        return 7
+    if "second" in h:
+        return 8
+    if "first" in h:
+        return 9
     return 99
 
 
 def _event_round(event: dict) -> str:
+    """Return display-ready round name. Tries notes headline first, falls back to season.slug."""
     notes = event.get("competitions", [{}])[0].get("notes", [])
-    return notes[0].get("headline", "").strip() if notes else ""
+    if notes:
+        headline = notes[0].get("headline", "").strip()
+        if headline:
+            return headline
+    slug = event.get("season", {}).get("slug", "")
+    return _SLUG_DISPLAY.get(slug, slug.replace("-", " ").title()) if slug else ""
 
 
 def _winner_id(event: dict) -> str | None:
     if event.get("status", {}).get("type", {}).get("state") != "post":
         return None
-    competitors = event["competitions"][0]["competitors"]
-    try:
-        scored = [(c, int(c.get("score") or "0")) for c in competitors]
-        winner = max(scored, key=lambda x: x[1])[0]
-        return str(winner["team"]["id"])
-    except (ValueError, TypeError, IndexError):
-        return None
+    competitors = event.get("competitions", [{}])[0].get("competitors", [])
+    winner = next((c for c in competitors if c.get("winner")), None)
+    return str(winner["team"]["id"]) if winner else None
 
 
 def _fmt_team(comp: dict, width: int = 10) -> str:

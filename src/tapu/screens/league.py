@@ -216,7 +216,8 @@ class LeagueScreen(Screen):
             if not events:
                 await matches_pane.mount(Static("[dim]No matches[/dim]", classes="no-matches"))
             else:
-                for round_name, round_evs in _group_events_by_round(events):
+                rounds = _group_events_by_round(events)[:3]
+                for round_name, round_evs in rounds:
                     await matches_pane.mount(Static(round_name, classes="section-header"))
                     for ev in round_evs:
                         await matches_pane.mount(MatchCard(ev))

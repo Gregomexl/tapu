@@ -63,11 +63,15 @@ def test_winner_id_returns_none_for_in_progress():
 
 def test_winner_id_returns_home_winner():
     ev = _make_event("Final", "1", "2", home_score="2", away_score="1", state="post")
+    ev["competitions"][0]["competitors"][0]["winner"] = True
+    ev["competitions"][0]["competitors"][1]["winner"] = False
     assert _winner_id(ev) == "1"
 
 
 def test_winner_id_returns_away_winner():
     ev = _make_event("Final", "1", "2", home_score="0", away_score="1", state="post")
+    ev["competitions"][0]["competitors"][0]["winner"] = False
+    ev["competitions"][0]["competitors"][1]["winner"] = True
     assert _winner_id(ev) == "2"
 
 
