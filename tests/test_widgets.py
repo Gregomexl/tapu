@@ -1,6 +1,7 @@
 import pytest
 from textual.app import App, ComposeResult
 from tapu.config import League
+from tapu.widgets.bracket import BracketWidget
 from tapu.widgets.league_card import LeagueCard
 from tapu.widgets.match_card import MatchCard
 from tapu.widgets.standings import StandingsTable
@@ -78,6 +79,50 @@ async def test_match_card_live_status(sample_scoreboard):
     async with _TestApp(event).run_test() as pilot:
         card = pilot.app.query_one(MatchCard)
         assert card.is_live is True
+
+
+def _bracket_events() -> list[dict]:
+    def ev(round_name, h_id, a_id, h_score="-", a_score="-", state="pre"):
+        return {
+            "status": {"type": {"state": state}},
+            "competitions": [{
+                "notes": [{"headline": round_name}],
+                "competitors": [
+                    {"homeAway": "home", "score": h_score,
+                     "team": {"id": h_id, "shortDisplayName": f"T{h_id}", "abbreviation": f"T{h_id}"}},
+                    {"homeAway": "away", "score": a_score,
+                     "team": {"id": a_id, "shortDisplayName": f"T{a_id}", "abbreviation": f"T{a_id}"}},
+                ],
+            }],
+        }
+    return [
+        ev("Quarterfinal", "10", "11", "2", "1", "post"),
+        ev("Quarterfinal", "12", "13", "0", "1", "post"),
+        ev("Semifinal", "10", "13", "1", "0", "post"),
+    ]
+
+
+class _BracketTestApp(App):
+    def __init__(self, events: list) -> None:
+        super().__init__()
+        self._events = events
+
+    def compose(self) -> ComposeResult:
+        yield BracketWidget(self._events)
+
+
+@pytest.mark.asyncio
+async def test_bracket_widget_renders():
+    async with _BracketTestApp(_bracket_events()).run_test() as pilot:
+        widget = pilot.app.query_one(BracketWidget)
+        assert widget is not None
+
+
+@pytest.mark.asyncio
+async def test_bracket_widget_renders_empty():
+    async with _BracketTestApp([]).run_test() as pilot:
+        widget = pilot.app.query_one(BracketWidget)
+        assert widget is not None
 
 
 @pytest.mark.asyncio
