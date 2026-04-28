@@ -29,6 +29,14 @@ def _status_label(event: dict) -> str:
     status = event["status"]["type"]
     state = status.get("state", "pre")
     if state == "in":
+        name = status.get("name", "")
+        if "HALFTIME" in name.upper() or "HALF_TIME" in name.upper():
+            return "[yellow]● HT[/yellow]"
+        period = event["status"].get("period", 1)
+        if period >= 2:
+            clock = event["status"].get("displayClock", "")
+            suffix = f" {clock}" if clock else ""
+            return f"[green]● LIVE{suffix}[/green]"
         return "[green]● LIVE[/green]"
     if state == "post":
         return f"[dim]{status.get('detail', 'FT')}[/dim]"
