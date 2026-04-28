@@ -55,7 +55,7 @@ full_name = "Liga MX"
 color = "#006847"
 matchday_label = "Week"
 relegation_spots = 0
-promotion_spots = 12
+promotion_spots = 8
 flag = "🇲🇽"
 
 [[leagues]]
