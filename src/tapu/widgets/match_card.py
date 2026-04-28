@@ -48,6 +48,8 @@ def _status_label(event: dict) -> str:
 class MatchCard(Widget, can_focus=True):
     BINDINGS: ClassVar[list[BindingType]] = [
         Binding("enter", "select", "View Match", show=False),
+        Binding("up", "focus_previous", "", show=False),
+        Binding("down", "focus_next", "", show=False),
     ]
 
     DEFAULT_CSS = """
@@ -111,6 +113,12 @@ class MatchCard(Widget, can_focus=True):
 
     def action_select(self) -> None:
         self.post_message(self.Selected(self.event["id"], self.event))
+
+    def action_focus_previous(self) -> None:
+        self.screen.focus_previous()
+
+    def action_focus_next(self) -> None:
+        self.screen.focus_next()
 
     class Selected(Message):
         def __init__(self, event_id: str, event: dict) -> None:
