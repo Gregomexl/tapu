@@ -25,7 +25,13 @@ def _row_style(
         desc = note.get("description", "").lower()
         if "relegat" in desc:
             return "bold red"
-        # Any competition zone (CL, EL, Conference, Promotion, Liguilla…)
+        if "champion" in desc:
+            return "bold cyan"
+        if "europa" in desc:
+            return "bold green"
+        if "conference" in desc:
+            return "bold yellow"
+        # Generic competition zone (liguilla, promotion, etc.)
         return "bold green"
     # Static fallback
     if relegation_spots > 0 and rank > total - relegation_spots:
