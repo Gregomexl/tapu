@@ -1,3 +1,4 @@
+import asyncio
 from collections import defaultdict
 from datetime import datetime, date, timedelta
 from typing import ClassVar
@@ -150,71 +151,92 @@ class LeagueScreen(Screen):
 
     def on_mount(self) -> None:
         self.sub_title = self.league.full_name
-        if not self.league.is_tournament:
-            self.run_worker(self._load_matches())
-        self.run_worker(self._load_standings())
+        self.run_worker(self._load_main())
         self._refresh_timer = self.set_interval(60, self._tick_refresh)
 
     def _tick_refresh(self) -> None:
-        if not self.league.is_tournament:
-            self._bg_refresh()
+        self._bg_refresh()
 
     @work(exit_on_error=False)
     async def _bg_refresh(self) -> None:
-        await self._load_matches()
+        await self._load_main()
 
-    async def _fetch_positions(self) -> dict[str, int]:
-        try:
-            standings = await self.client.get_standings(self.league.slug)
-            positions: dict[str, int] = {}
-            for child in standings.get("children", []):
-                for i, entry in enumerate(child.get("standings", {}).get("entries", []), 1):
-                    positions[str(entry["team"]["id"])] = i
-            if not positions:
-                for i, entry in enumerate(standings.get("standings", {}).get("entries", []), 1):
-                    positions[str(entry["team"]["id"])] = i
-            return positions
-        except Exception:
-            return {}
+    def _parse_positions(self, standings: dict) -> dict[str, int]:
+        positions: dict[str, int] = {}
+        for child in standings.get("children", []):
+            for i, entry in enumerate(child.get("standings", {}).get("entries", []), 1):
+                positions[str(entry["team"]["id"])] = i
+        if not positions:
+            for i, entry in enumerate(standings.get("standings", {}).get("entries", []), 1):
+                positions[str(entry["team"]["id"])] = i
+        return positions
 
-    async def _load_matches(self) -> None:
+    async def _render_matches(self, sb: dict) -> None:
+        today = date.today()
+        pane = self.query_one("#matches-pane", VerticalScroll)
+        events = sb.get("events", [])
+        await pane.remove_children()
+        if not events:
+            await pane.mount(Static("[dim]No matches[/dim]", classes="no-matches"))
+            return
+        widgets: list = []
+        for day, day_evs in _group_events_by_day(events):
+            widgets.append(Static(_day_label(day, today), classes="section-header"))
+            for ev in day_evs:
+                widgets.append(MatchCard(ev, positions=self._positions))
+        await pane.mount(*widgets)
+
+    async def _render_standings(self, standings: dict) -> None:
+        pane = self.query_one("#standings-pane", VerticalScroll)
+        await pane.remove_children()
+        children = standings.get("children", [])
+        if self.league.is_tournament and len(children) > 4:
+            await pane.mount(WCGroupsWidget(standings))
+        else:
+            await pane.mount(StandingsTable(standings, self.league.relegation_spots, self.league.promotion_spots))
+
+    async def _load_main(self) -> None:
         today = date.today()
         start = today - timedelta(days=self._days_back)
-        pane = self.query_one("#matches-pane", VerticalScroll)
-        try:
-            if not self._positions:
-                self._positions = await self._fetch_positions()
-            sb = await self.client.get_scoreboard_daterange(
+
+        if self.league.is_tournament:
+            try:
+                standings = await self.client.get_standings(self.league.slug)
+                await self._render_standings(standings)
+            except Exception:
+                pane = self.query_one("#standings-pane", VerticalScroll)
+                await pane.remove_children()
+                await pane.mount(Static("[red]Standings unavailable[/red]"))
+            return
+
+        results = await asyncio.gather(
+            self.client.get_standings(self.league.slug),
+            self.client.get_scoreboard_daterange(
                 self.league.slug,
                 _date_to_api(start),
                 _date_to_api(today),
-            )
-            events = sb.get("events", [])
-            await pane.remove_children()
-            if not events:
-                await pane.mount(Static("[dim]No matches[/dim]", classes="no-matches"))
-                return
-            for day, day_evs in _group_events_by_day(events):
-                await pane.mount(Static(_day_label(day, today), classes="section-header"))
-                for ev in day_evs:
-                    await pane.mount(MatchCard(ev, positions=self._positions))
-        except Exception:
-            await pane.remove_children()
-            await pane.mount(Static("[red]Failed to load[/red]", classes="no-matches"))
+            ),
+            return_exceptions=True,
+        )
+        standings, sb = results[0], results[1]
 
-    async def _load_standings(self) -> None:
-        pane = self.query_one("#standings-pane", VerticalScroll)
-        try:
-            standings = await self.client.get_standings(self.league.slug)
-            await pane.remove_children()
-            children = standings.get("children", [])
-            if self.league.is_tournament and len(children) > 4:
-                await pane.mount(WCGroupsWidget(standings))
-            else:
-                await pane.mount(StandingsTable(standings, self.league.relegation_spots, self.league.promotion_spots))
-        except Exception:
-            await pane.remove_children()
-            await pane.mount(Static("[red]Standings unavailable[/red]"))
+        if not isinstance(standings, Exception):
+            self._positions = self._parse_positions(standings)
+
+        matches_pane = self.query_one("#matches-pane", VerticalScroll)
+        standings_pane = self.query_one("#standings-pane", VerticalScroll)
+
+        if isinstance(sb, Exception):
+            await matches_pane.remove_children()
+            await matches_pane.mount(Static("[red]Failed to load[/red]", classes="no-matches"))
+        else:
+            await self._render_matches(sb)
+
+        if isinstance(standings, Exception):
+            await standings_pane.remove_children()
+            await standings_pane.mount(Static("[red]Standings unavailable[/red]"))
+        else:
+            await self._render_standings(standings)
 
     def on_tabbed_content_tab_activated(self, event: TabbedContent.TabActivated) -> None:
         pane_id = event.pane.id if event.pane else None
@@ -280,12 +302,7 @@ class LeagueScreen(Screen):
         self.client.clear_cache()
         active = self.query_one(TabbedContent).active
         if active == "tab-main" or not active:
-            if self.league.is_tournament:
-                self.run_worker(self._load_standings())
-            else:
-                self._positions.clear()
-                self.run_worker(self._load_matches())
-                self.run_worker(self._load_standings())
+            self.run_worker(self._load_main())
         elif active == "tab-bracket":
             self._loaded_tabs.discard(active)
             self._load_league_bracket()
@@ -301,7 +318,7 @@ class LeagueScreen(Screen):
         if active != "tab-main":
             return
         self._days_back += 7
-        self.run_worker(self._load_matches())
+        self.run_worker(self._load_main())
 
     def on_match_card_selected(self, message: MatchCard.Selected) -> None:
         from tapu.screens.match import MatchScreen
