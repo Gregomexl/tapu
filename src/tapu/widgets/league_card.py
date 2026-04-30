@@ -13,6 +13,10 @@ from tapu.config import League
 class LeagueCard(Widget, can_focus=True):
     BINDINGS: ClassVar[list[BindingType]] = [
         Binding("enter", "select", "Open League", show=False),
+        Binding("up", "focus_previous", "", show=False),
+        Binding("left", "focus_previous", "", show=False),
+        Binding("down", "focus_next", "", show=False),
+        Binding("right", "focus_next", "", show=False),
     ]
 
     DEFAULT_CSS = """
@@ -78,6 +82,12 @@ class LeagueCard(Widget, can_focus=True):
 
     def action_select(self) -> None:
         self.post_message(self.Selected(self.league))
+
+    def action_focus_previous(self) -> None:
+        self.screen.focus_previous()
+
+    def action_focus_next(self) -> None:
+        self.screen.focus_next()
 
     def on_click(self) -> None:
         self.post_message(self.Selected(self.league))

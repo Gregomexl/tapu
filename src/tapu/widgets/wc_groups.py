@@ -2,6 +2,7 @@ from typing import Any
 
 from rich.text import Text
 from textual.app import ComposeResult
+from textual.binding import Binding
 from textual.containers import ItemGrid
 from textual.message import Message
 from textual.widget import Widget
@@ -39,6 +40,13 @@ class GroupCard(Widget):
     """Selectable group card showing a mini standings table."""
 
     can_focus = True
+    BINDINGS = [
+        Binding("enter", "select", "Open Group", show=False),
+        Binding("up", "focus_previous", "", show=False),
+        Binding("left", "focus_previous", "", show=False),
+        Binding("down", "focus_next", "", show=False),
+        Binding("right", "focus_next", "", show=False),
+    ]
 
     DEFAULT_CSS = """
     GroupCard {

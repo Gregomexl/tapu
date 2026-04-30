@@ -78,7 +78,6 @@ full_name = "Serie A"
 ## Requirements
 
 - [uv](https://docs.astral.sh/uv/getting-started/installation/) (handles Python 3.13+ automatically)
-- [chafa](https://hpjansson.org/chafa/) (optional — for team logos in match detail)
 
 ## License
 
