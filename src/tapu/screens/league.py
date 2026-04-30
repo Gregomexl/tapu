@@ -287,11 +287,12 @@ class LeagueScreen(Screen):
             if not events:
                 await matches_pane.mount(Static("[dim]No matches[/dim]", classes="no-matches"))
             else:
-                rounds = _group_events_by_round(events)
-                for round_name, round_evs in rounds:
-                    await matches_pane.mount(Static(round_name, classes="section-header"))
+                widgets: list = []
+                for round_name, round_evs in _group_events_by_round(events):
+                    widgets.append(Static(round_name, classes="section-header"))
                     for ev in round_evs:
-                        await matches_pane.mount(MatchCard(ev))
+                        widgets.append(MatchCard(ev))
+                await matches_pane.mount(*widgets)
             await bracket_pane.remove_children()
             await bracket_pane.mount(BracketWidget(events))
         except Exception:
