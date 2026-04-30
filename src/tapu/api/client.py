@@ -121,11 +121,6 @@ class ESPNClient:
 
     def clear_cache(self) -> None:
         self._cache.clear()
-        try:
-            for f in DISK_CACHE_DIR.glob("*.json"):
-                f.unlink()
-        except Exception:
-            pass
 
     async def aclose(self) -> None:
         await self._http.aclose()

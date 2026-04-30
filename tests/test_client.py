@@ -84,6 +84,22 @@ async def test_clear_cache(client, sample_scoreboard):
 
 
 @pytest.mark.asyncio
+async def test_clear_cache_preserves_disk_files(tmp_path, monkeypatch):
+    import json, time
+    from tapu.api import client as client_module
+    monkeypatch.setattr(client_module, "DISK_CACHE_DIR", tmp_path)
+
+    c = ESPNClient()
+    cache_file = tmp_path / "some_cached_endpoint.json"
+    cache_file.write_text(json.dumps({"ts": time.time(), "data": {"events": []}}))
+
+    c.clear_cache()
+
+    assert cache_file.exists()
+    await c.aclose()
+
+
+@pytest.mark.asyncio
 async def test_aclose(client):
     with patch.object(client._http, "aclose", new_callable=AsyncMock) as mock_close:
         await client.aclose()
