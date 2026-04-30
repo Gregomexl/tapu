@@ -1,10 +1,10 @@
 import json
 from datetime import datetime
+from json import JSONDecodeError
 from pathlib import Path
 from typing import Any
 
 import httpx
-from json import JSONDecodeError
 
 BASE_URL = "https://site.api.espn.com/apis/site/v2/sports/soccer"
 STANDINGS_URL = "https://site.web.api.espn.com/apis/v2/sports/soccer"

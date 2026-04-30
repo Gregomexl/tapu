@@ -1,6 +1,6 @@
 import asyncio
 from collections import defaultdict
-from datetime import datetime, date, timedelta
+from datetime import date, datetime, timedelta
 from typing import ClassVar
 
 from textual import work
@@ -139,14 +139,13 @@ class LeagueScreen(Screen):
                     )
             for related in self.league.related:
                 tab_id = f"tab-{related.slug.replace('.', '-')}"
-                with TabPane(related.name, id=tab_id):
-                    with Horizontal(classes="main-row"):
-                        yield VerticalScroll(
-                            Static("[dim]Loading...[/dim]", classes="no-matches"),
-                            id=f"matches-{tab_id}",
-                            classes="matches-col",
-                        )
-                        yield VerticalScroll(id=f"bracket-{tab_id}", classes="standings-col")
+                with TabPane(related.name, id=tab_id), Horizontal(classes="main-row"):
+                    yield VerticalScroll(
+                        Static("[dim]Loading...[/dim]", classes="no-matches"),
+                        id=f"matches-{tab_id}",
+                        classes="matches-col",
+                    )
+                    yield VerticalScroll(id=f"bracket-{tab_id}", classes="standings-col")
         yield Footer()
 
     def on_mount(self) -> None:

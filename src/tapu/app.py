@@ -1,5 +1,4 @@
-from textual.app import App, ComposeResult
-from textual.widgets import Header, Footer, Static
+from textual.app import App
 
 from tapu.api import ESPNClient
 from tapu.config import load_leagues

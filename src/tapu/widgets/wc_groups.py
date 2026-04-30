@@ -6,7 +6,7 @@ from textual.binding import Binding
 from textual.containers import ItemGrid
 from textual.message import Message
 from textual.widget import Widget
-from textual.widgets import DataTable, Label, Static
+from textual.widgets import DataTable, Label
 
 
 def _stat(stats: list[dict], name: str) -> str:
