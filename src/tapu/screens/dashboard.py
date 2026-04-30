@@ -104,11 +104,12 @@ class DashboardScreen(Screen):
         loader.display = False
 
         await grid.remove_children()
+        cards: list = []
         for league in self.leagues:
             card_id = f"card-{league.slug.replace('.', '-')}"
             sb = self._scoreboards.get(league.slug, {})
-            await grid.mount(LeagueCard(league, sb, self.client, id=card_id))
-        cards = list(grid.query(LeagueCard))
+            cards.append(LeagueCard(league, sb, self.client, id=card_id))
+        await grid.mount(*cards)
         if cards:
             cards[0].focus()
 

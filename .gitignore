@@ -16,3 +16,4 @@ dist/
 
 # Example / scratch images
 example_images/
+.worktrees/
