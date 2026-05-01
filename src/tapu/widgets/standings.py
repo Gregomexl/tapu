@@ -14,7 +14,7 @@ def _stat(stats: list[dict], name: str) -> str:
 
 
 def _form_dots(form_str: str) -> str:
-    colors = {"W": "$success", "D": "$warning", "L": "$error"}
+    colors = {"W": "green", "D": "yellow", "L": "red"}
     parts = []
     for ch in form_str.upper():
         color = colors.get(ch)

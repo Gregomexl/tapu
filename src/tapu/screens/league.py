@@ -423,6 +423,18 @@ class LeagueScreen(Screen):
         if event.input.id == "filter-input":
             self.query_one("#matches-pane", VerticalScroll).focus()
 
+    def on_key(self, event) -> None:
+        if event.key == "escape":
+            with contextlib.suppress(Exception):
+                inp = self.query_one("#filter-input", Input)
+                if inp.has_focus:
+                    self._team_query = ""
+                    inp.value = ""
+                    self.query_one("#matches-pane", VerticalScroll).focus()
+                    if self._current_sb:
+                        self.run_worker(self._render_matches(self._current_sb))
+                    event.stop()
+
     def action_cycle_filter(self) -> None:
         order = ["all", "live", "done", "upcoming"]
         idx = order.index(self._status_filter)
