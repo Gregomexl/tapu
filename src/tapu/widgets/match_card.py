@@ -1,14 +1,17 @@
+import contextlib
 from datetime import datetime
 from typing import Any, ClassVar
 
 from textual.app import ComposeResult
 from textual.binding import Binding, BindingType
+from textual.containers import Horizontal
 from textual.message import Message
 from textual.reactive import reactive
 from textual.widget import Widget
 from textual.widgets import Static
 
 from tapu.api import ESPNClient
+from tapu.widgets.team_logo import TeamLogo
 
 
 def _get_team(competitors: list[dict], home_away: str) -> dict:
@@ -119,6 +122,20 @@ class MatchCard(Widget, can_focus=True):
         color: $success;
         text-style: bold;
     }
+    MatchCard .logo-row {
+        height: auto;
+        align: left middle;
+    }
+    MatchCard TeamLogo {
+        width: 5;
+        height: 3;
+        margin-right: 1;
+    }
+    MatchCard .score-text {
+        width: 1fr;
+        height: auto;
+        content-align: left middle;
+    }
     """
 
     _pulse_on: reactive[bool] = reactive(True)
@@ -152,13 +169,11 @@ class MatchCard(Widget, can_focus=True):
         home_score = self._home.get("score", "-")
         away_score = self._away.get("score", "-")
         status = _status_label(self.event, self._pulse_on)
-        return f"[bold]{home_abbr}[/bold]  {home_score} – {away_score}  [bold]{away_abbr}[/bold]  {status}"
+        return f"[bold]{home_abbr}[/bold]  {home_score} - {away_score}  [bold]{away_abbr}[/bold]  {status}"
 
     def watch__pulse_on(self, value: bool) -> None:
-        try:
+        with contextlib.suppress(Exception):
             self.query_one("#line1", Static).update(self._render_line1())
-        except Exception:
-            pass
 
     def on_mount(self) -> None:
         if self._flash:
@@ -175,7 +190,17 @@ class MatchCard(Widget, can_focus=True):
         self._pulse_on = not self._pulse_on
 
     def compose(self) -> ComposeResult:
-        yield Static(self._render_line1(), id="line1")
+        home_logos = self._home["team"].get("logos")
+        away_logos = self._away["team"].get("logos")
+        if self._client and (home_logos or away_logos):
+            with Horizontal(classes="logo-row"):
+                if home_logos:
+                    yield TeamLogo(home_logos, self._client, px_width=10, px_height=6)
+                yield Static(self._render_line1(), id="line1", classes="score-text")
+                if away_logos:
+                    yield TeamLogo(away_logos, self._client, px_width=10, px_height=6)
+        else:
+            yield Static(self._render_line1(), id="line1")
         venue = self.event["competitions"][0].get("venue", {})
         stadium = venue.get("fullName", "")
         city = venue.get("address", {}).get("city", "")
