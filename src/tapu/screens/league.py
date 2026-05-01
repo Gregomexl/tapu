@@ -55,6 +55,13 @@ def _group_events_by_round(events: list) -> list[tuple[str, list]]:
     return sorted(by_round.items(), key=lambda x: _round_key(x[0]))
 
 
+def _get_event_scores(event: dict) -> tuple[str, str]:
+    competitors = event.get("competitions", [{}])[0].get("competitors", [])
+    home = next((c for c in competitors if c.get("homeAway") == "home"), {})
+    away = next((c for c in competitors if c.get("homeAway") == "away"), {})
+    return home.get("score", ""), away.get("score", "")
+
+
 def _day_label(d: date, today: date) -> str:
     if d == today:
         return f"TODAY  ·  {d.strftime('%a %b %-d, %Y')}"
@@ -110,6 +117,7 @@ class LeagueScreen(Screen):
         self._refresh_timer: Timer | None = None
         self._positions: dict[str, int] = {}
         self._loaded_tabs: set[str] = set()
+        self._prev_scores: dict[str, tuple[str, str]] = {}
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -174,6 +182,16 @@ class LeagueScreen(Screen):
         today = date.today()
         pane = self.query_one("#matches-pane", VerticalScroll)
         events = sb.get("events", [])
+
+        flash_ids: set[str] = set()
+        for event in events:
+            eid = event["id"]
+            new_scores = _get_event_scores(event)
+            old_scores = self._prev_scores.get(eid)
+            if old_scores is not None and old_scores != new_scores:
+                flash_ids.add(eid)
+            self._prev_scores[eid] = new_scores
+
         await pane.remove_children()
         if not events:
             await pane.mount(Static("[dim]No matches[/dim]", classes="no-matches"))
@@ -182,7 +200,7 @@ class LeagueScreen(Screen):
         for day, day_evs in _group_events_by_day(events):
             widgets.append(Static(_day_label(day, today), classes="section-header"))
             for ev in day_evs:
-                widgets.append(MatchCard(ev, positions=self._positions))
+                widgets.append(MatchCard(ev, positions=self._positions, flash=ev["id"] in flash_ids))
         await pane.mount(*widgets)
 
     async def _render_standings(self, standings: dict) -> None:

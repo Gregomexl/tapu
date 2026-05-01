@@ -1,4 +1,5 @@
 import asyncio
+from datetime import datetime
 from typing import ClassVar
 
 from textual import work
@@ -66,6 +67,7 @@ class DashboardScreen(Screen):
         self.leagues = leagues
         self._scoreboards: dict[str, dict] = {}
         self._refresh_timer: Timer | None = None
+        self._last_refresh: datetime | None = None
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -78,6 +80,7 @@ class DashboardScreen(Screen):
     def on_mount(self) -> None:
         self.run_worker(self._load_all())
         self._refresh_timer = self.set_interval(60, self._tick_refresh)
+        self.set_interval(10, self._update_subtitle)
 
     def _tick_refresh(self) -> None:
         self._bg_refresh()
@@ -86,7 +89,7 @@ class DashboardScreen(Screen):
     async def _bg_refresh(self) -> None:
         await self._load_all(show_loader=False)
 
-    async def _load_all(self, show_loader: bool = True) -> None:
+    async def _load_all(self, show_loader: bool = True, manual: bool = False) -> None:
         loader = self.query_one("#loader", LoadingIndicator)
         grid = self.query_one("#cards-grid", ItemGrid)
 
@@ -94,10 +97,10 @@ class DashboardScreen(Screen):
             loader.display = True
 
         results = await asyncio.gather(
-            *[self.client.get_scoreboard(l.slug) for l in self.leagues],
+            *[self.client.get_scoreboard(league.slug) for league in self.leagues],
             return_exceptions=True,
         )
-        for league, result in zip(self.leagues, results):
+        for league, result in zip(self.leagues, results, strict=False):
             if not isinstance(result, Exception):
                 self._scoreboards[league.slug] = result
 
@@ -113,10 +116,28 @@ class DashboardScreen(Screen):
         if cards:
             cards[0].focus()
 
+        self._last_refresh = datetime.now()
+        self._update_subtitle()
+
+        if manual:
+            updated = sum(1 for sb in self._scoreboards.values() if sb)
+            self.app.notify(f"Scores refreshed · {updated} leagues updated", timeout=4)
+
+    def _update_subtitle(self) -> None:
+        if self._last_refresh is None:
+            return
+        delta = int((datetime.now() - self._last_refresh).total_seconds())
+        if delta < 10:
+            self.sub_title = "Updated just now"
+        elif delta < 60:
+            self.sub_title = f"Updated {delta}s ago"
+        else:
+            self.sub_title = f"Updated {delta // 60}m ago"
+
     def action_refresh(self) -> None:
         self.client.clear_cache()
         self._scoreboards.clear()
-        self.run_worker(self._load_all())
+        self.run_worker(self._load_all(manual=True))
 
     def on_league_card_selected(self, message: LeagueCard.Selected) -> None:
         from tapu.screens.league import LeagueScreen
