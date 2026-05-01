@@ -1,4 +1,5 @@
 import asyncio
+from datetime import datetime
 from typing import ClassVar
 
 from textual import work
@@ -66,6 +67,7 @@ class DashboardScreen(Screen):
         self.leagues = leagues
         self._scoreboards: dict[str, dict] = {}
         self._refresh_timer: Timer | None = None
+        self._last_refresh: datetime | None = None
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -78,6 +80,7 @@ class DashboardScreen(Screen):
     def on_mount(self) -> None:
         self.run_worker(self._load_all())
         self._refresh_timer = self.set_interval(60, self._tick_refresh)
+        self.set_interval(10, self._update_subtitle)
 
     def _tick_refresh(self) -> None:
         self._bg_refresh()
@@ -112,6 +115,20 @@ class DashboardScreen(Screen):
         await grid.mount(*cards)
         if cards:
             cards[0].focus()
+
+        self._last_refresh = datetime.now()
+        self._update_subtitle()
+
+    def _update_subtitle(self) -> None:
+        if self._last_refresh is None:
+            return
+        delta = int((datetime.now() - self._last_refresh).total_seconds())
+        if delta < 10:
+            self.sub_title = "Updated just now"
+        elif delta < 60:
+            self.sub_title = f"Updated {delta}s ago"
+        else:
+            self.sub_title = f"Updated {delta // 60}m ago"
 
     def action_refresh(self) -> None:
         self.client.clear_cache()
