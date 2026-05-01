@@ -153,8 +153,11 @@ def test_build_substitutions_only_returns_subs_in_order():
     lines = build_substitutions(_timeline_event_with_two_teams(), summary)
     assert len(lines) == 2
     # Ordered by clock seconds: 64 then 72
-    assert "García" in lines[0] and "🔄" in lines[0] and "RMA" in lines[0]
+    assert "García" in lines[0] and "RMA" in lines[0]
     assert "Pedri" in lines[1] and "BAR" in lines[1]
+    # Substitution rows render without an emoji icon — minute · names · ABBR only.
+    assert "🔄" not in lines[0]
+    assert "🔄" not in lines[1]
 
 
 def test_build_substitutions_empty_when_none():

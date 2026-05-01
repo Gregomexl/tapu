@@ -111,7 +111,7 @@ def build_substitutions(event: dict, summary: dict) -> list[str]:
         text = _sub_text(k)
         abbr = abbrs.get(team_id, "")
         abbr_suffix = f"  [dim]{abbr}[/dim]" if abbr else ""
-        items.append((secs, f"🔄  [dim]{clock_val:>5}'[/dim]  {text}{abbr_suffix}"))
+        items.append((secs, f"[dim]{clock_val:>5}'[/dim]  {text}{abbr_suffix}"))
 
     items.sort(key=lambda x: x[0])
     return [s for _, s in items]
@@ -503,7 +503,7 @@ class MatchDetail(Widget):
             if timeline_lines
             else Static("[dim]  No events yet[/dim]", classes="timeline")
         )
-        return [Static("📋  Timeline", classes="section-label"), body]
+        return [Static("── Timeline", classes="section-label"), body]
 
     def _build_subs_widgets(self, state: str) -> list[Widget]:
         # Substitutions live in their own section under the timeline so tactical
@@ -514,7 +514,7 @@ class MatchDetail(Widget):
         if not sub_lines:
             return []
         return [
-            Static("🔄  Substitutions", classes="section-label"),
+            Static("── Substitutions", classes="section-label"),
             Static("\n".join(sub_lines), classes="timeline"),
         ]
 
@@ -522,7 +522,7 @@ class MatchDetail(Widget):
         lineups = build_lineups(self.event, self.summary)
         if not lineups:
             return []
-        widgets: list[Widget] = [Static("👥  Lineups", classes="section-label")]
+        widgets: list[Widget] = [Static("── Lineups", classes="section-label")]
         for lines in lineups:
             widgets.append(Static("\n".join(lines), classes="lineup"))
         return widgets
@@ -539,7 +539,7 @@ class MatchDetail(Widget):
         a = {s["name"]: s["displayValue"] for s in away_td.get("statistics", [])}
 
         widgets: list[Widget] = [
-            Static("📊  Stats", classes="section-label"),
+            Static("── Stats", classes="section-label"),
             Static(
                 f"[bold]{home_abbr}[/bold]                                         [bold]{away_abbr}[/bold]",
                 classes="stats-header",
