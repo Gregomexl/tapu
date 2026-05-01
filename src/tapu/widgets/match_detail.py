@@ -2,6 +2,7 @@ from datetime import datetime
 from typing import Any
 
 from textual.app import ComposeResult
+from textual.containers import Horizontal, VerticalScroll
 from textual.widget import Widget
 from textual.widgets import Static
 
@@ -256,6 +257,9 @@ STAT_KEYS = [
 ]
 
 
+THREE_COL_THRESHOLD = 120  # min terminal width before switching to three-column layout
+
+
 class MatchDetail(Widget):
     DEFAULT_CSS = """
     MatchDetail {
@@ -263,6 +267,27 @@ class MatchDetail(Widget):
         width: 80;
         max-width: 100%;
         padding: 1 2;
+    }
+    MatchDetail.wide {
+        width: 1fr;
+        height: 1fr;
+        padding: 1 1;
+    }
+    MatchDetail .three-col {
+        height: 1fr;
+        width: 100%;
+    }
+    MatchDetail .col-side {
+        width: 1fr;
+        height: 1fr;
+        padding: 0 1;
+    }
+    MatchDetail .col-center {
+        width: 2fr;
+        height: 1fr;
+        padding: 0 1;
+        border-left: solid $surface-lighten-2;
+        border-right: solid $surface-lighten-2;
     }
     MatchDetail .score-block {
         width: 1fr;
@@ -326,7 +351,45 @@ class MatchDetail(Widget):
         self._positions = positions or {}
         self._is_live = event["status"]["type"].get("state") == "in"
 
+    def on_mount(self) -> None:
+        if self._terminal_width() >= THREE_COL_THRESHOLD:
+            self.add_class("wide")
+
+    def _terminal_width(self) -> int:
+        try:
+            return self.app.size.width
+        except Exception:
+            return 80
+
     def compose(self) -> ComposeResult:
+        # Build each section as a list of pre-instantiated Static widgets, then arrange
+        # them either stacked (narrow) or in three columns (≥ THREE_COL_THRESHOLD).
+        # Keeping the section-construction code in one place avoids duplicating it across
+        # the two layout branches.
+        header_widgets, state, home_id, home_abbr, away_abbr = self._build_header_widgets()
+        live_widgets = self._build_live_widgets(state)
+        timeline_widgets = self._build_timeline_widgets(state)
+        lineups_widgets = self._build_lineups_widgets()
+        stats_widgets = self._build_stats_widgets(home_id, home_abbr, away_abbr)
+
+        if self._terminal_width() >= THREE_COL_THRESHOLD:
+            with Horizontal(classes="three-col"):
+                with VerticalScroll(classes="col-side"):
+                    yield from timeline_widgets
+                    yield from live_widgets
+                with VerticalScroll(classes="col-center"):
+                    yield from header_widgets
+                    yield from stats_widgets
+                with VerticalScroll(classes="col-side"):
+                    yield from lineups_widgets
+        else:
+            yield from header_widgets
+            yield from live_widgets
+            yield from timeline_widgets
+            yield from lineups_widgets
+            yield from stats_widgets
+
+    def _build_header_widgets(self) -> tuple[list[Widget], str, str, str, str]:
         competition = self.event["competitions"][0]
         competitors = competition["competitors"]
         home = _get_team(competitors, "home")
@@ -338,15 +401,16 @@ class MatchDetail(Widget):
         home_abbr = home["team"].get("shortDisplayName") or home["team"]["abbreviation"]
         away_abbr = away["team"].get("shortDisplayName") or away["team"]["abbreviation"]
         home_id = str(home["team"]["id"])
+        status = self.event["status"]["type"]
+        state = status.get("state", "pre")
 
+        widgets: list[Widget] = []
 
-        # Group label (UCL, Europa, World Cup, etc.)
         notes = competition.get("notes", [])
         group = notes[0].get("headline", "") if notes else ""
         if group:
-            yield Static(f"[dim]{group}[/dim]", classes="status-line")
+            widgets.append(Static(f"[dim]{group}[/dim]", classes="status-line"))
 
-        # Team color badges
         def _badge(team: dict) -> str:
             color = team.get("color", "")
             hex_color = f"#{color}" if color and len(color) == 6 else None
@@ -356,94 +420,98 @@ class MatchDetail(Widget):
 
         home_badge = _badge(home["team"])
         away_badge = _badge(away["team"])
-        yield Static(
+        widgets.append(Static(
             f"{home_badge} [bold]{home_name}[/bold]  "
             f"[bold yellow]{home_score}  –  {away_score}[/bold yellow]  "
             f"[bold]{away_name}[/bold] {away_badge}",
             classes="score-block",
-        )
+        ))
 
-        # Date
         date_str = self.event.get("date", "")
         if date_str:
-            yield Static(f"[dim]{_format_local_time(date_str)}[/dim]", classes="status-line")
+            widgets.append(Static(f"[dim]{_format_local_time(date_str)}[/dim]", classes="status-line"))
 
-        # Status / clock
-        status = self.event["status"]["type"]
-        state = status.get("state", "pre")
         status_text = format_live_status(self.event, show_clock=True) or f"[dim]{status.get('detail', 'Upcoming')}[/dim]"
-        yield Static(status_text, id="status-clock", classes="status-line")
+        widgets.append(Static(status_text, id="status-clock", classes="status-line"))
 
-        # Venue
         venue = competition.get("venue", {})
         stadium = venue.get("fullName", "")
         city = venue.get("address", {}).get("city", "")
         if stadium or city:
             location = f"{stadium} · {city}" if stadium and city else stadium or city
-            yield Static(f"[dim]{location}[/dim]", classes="venue-line")
+            widgets.append(Static(f"[dim]{location}[/dim]", classes="venue-line"))
 
-        # Match meta: weather · referee · attendance
         meta_parts = _extract_meta(self.event, self.summary)
         if meta_parts:
-            yield Static(f"[dim]{' · '.join(meta_parts)}[/dim]", classes="venue-line")
+            widgets.append(Static(f"[dim]{' · '.join(meta_parts)}[/dim]", classes="venue-line"))
 
-        # Live commentary
-        if state == "in":
-            commentary = self.summary.get("commentary", [])
-            recent = [c for c in reversed(commentary) if c.get("text")][:5]
-            if recent:
-                lines = []
-                for c in recent:
-                    minute = c.get("time", {}).get("displayValue", "")
-                    text = c.get("text", "")
-                    prefix = f"[dim]{minute:>3}'[/dim]  " if minute else "      "
-                    lines.append(f"{prefix}{text}")
-                yield Static("── Live Updates", classes="section-label")
-                yield Static("\n".join(lines), id="commentary", classes="commentary")
+        return widgets, state, home_id, home_abbr, away_abbr
 
-        # Timeline — goals · cards · subs in chronological order, tagged by team color.
-        # Replaces the previous home/away split for Goals and Cards: one feed reads as
-        # the actual narrative of the match, and substitutions slot in naturally.
-        if state in ("in", "post"):
-            timeline_lines = build_timeline(self.event, self.summary)
-            yield Static("📋  Timeline", classes="section-label")
-            if timeline_lines:
-                yield Static("\n".join(timeline_lines), classes="timeline")
-            else:
-                yield Static("[dim]  No events yet[/dim]", classes="timeline")
+    def _build_live_widgets(self, state: str) -> list[Widget]:
+        if state != "in":
+            return []
+        commentary = self.summary.get("commentary", [])
+        recent = [c for c in reversed(commentary) if c.get("text")][:5]
+        if not recent:
+            return []
+        lines = []
+        for c in recent:
+            minute = c.get("time", {}).get("displayValue", "")
+            text = c.get("text", "")
+            prefix = f"[dim]{minute:>3}'[/dim]  " if minute else "      "
+            lines.append(f"{prefix}{text}")
+        return [
+            Static("── Live Updates", classes="section-label"),
+            Static("\n".join(lines), id="commentary", classes="commentary"),
+        ]
 
-        # Lineups — formation + starting XI per team, with bench summary.
-        # ESPN publishes rosters ~1h before kickoff; the section just hides until then.
+    def _build_timeline_widgets(self, state: str) -> list[Widget]:
+        if state not in ("in", "post"):
+            return []
+        timeline_lines = build_timeline(self.event, self.summary)
+        body = (
+            Static("\n".join(timeline_lines), classes="timeline")
+            if timeline_lines
+            else Static("[dim]  No events yet[/dim]", classes="timeline")
+        )
+        return [Static("📋  Timeline", classes="section-label"), body]
+
+    def _build_lineups_widgets(self) -> list[Widget]:
         lineups = build_lineups(self.event, self.summary)
-        if lineups:
-            yield Static("👥  Lineups", classes="section-label")
-            for lines in lineups:
-                yield Static("\n".join(lines), classes="lineup")
+        if not lineups:
+            return []
+        widgets: list[Widget] = [Static("👥  Lineups", classes="section-label")]
+        for lines in lineups:
+            widgets.append(Static("\n".join(lines), classes="lineup"))
+        return widgets
 
-        # Stats with progress bars
+    def _build_stats_widgets(self, home_id: str, home_abbr: str, away_abbr: str) -> list[Widget]:
         teams_data = self.summary.get("boxscore", {}).get("teams", [])
-        if len(teams_data) >= 2:
-            by_id = {str(td["team"]["id"]): td for td in teams_data}
-            home_td = by_id.get(home_id, teams_data[0])
-            away_td = next((t for t in teams_data if str(t["team"]["id"]) != home_id), teams_data[1])
+        if len(teams_data) < 2:
+            return []
+        by_id = {str(td["team"]["id"]): td for td in teams_data}
+        home_td = by_id.get(home_id, teams_data[0])
+        away_td = next((t for t in teams_data if str(t["team"]["id"]) != home_id), teams_data[1])
 
-            h = {s["name"]: s["displayValue"] for s in home_td.get("statistics", [])}
-            a = {s["name"]: s["displayValue"] for s in away_td.get("statistics", [])}
+        h = {s["name"]: s["displayValue"] for s in home_td.get("statistics", [])}
+        a = {s["name"]: s["displayValue"] for s in away_td.get("statistics", [])}
 
-            yield Static("📊  Stats", classes="section-label")
-            yield Static(
+        widgets: list[Widget] = [
+            Static("📊  Stats", classes="section-label"),
+            Static(
                 f"[bold]{home_abbr}[/bold]                                         [bold]{away_abbr}[/bold]",
                 classes="stats-header",
-            )
-
-            for key, label, is_pct in STAT_KEYS:
-                hv, av = h.get(key, "-"), a.get(key, "-")
-                if hv == "-" and av == "-":
-                    continue
-                home_bar, away_bar = _stat_bar(hv, av)
-                hv_display = _fmt_stat(hv, is_pct)
-                av_display = _fmt_stat(av, is_pct)
-                yield Static(
-                    f"[bold]{hv_display:>6}[/bold] {home_bar}  [dim]{label:<12}[/dim]  {away_bar} [bold]{av_display:<6}[/bold]",
-                    classes="stat-row",
-                )
+            ),
+        ]
+        for key, label, is_pct in STAT_KEYS:
+            hv, av = h.get(key, "-"), a.get(key, "-")
+            if hv == "-" and av == "-":
+                continue
+            home_bar, away_bar = _stat_bar(hv, av)
+            hv_display = _fmt_stat(hv, is_pct)
+            av_display = _fmt_stat(av, is_pct)
+            widgets.append(Static(
+                f"[bold]{hv_display:>6}[/bold] {home_bar}  [dim]{label:<12}[/dim]  {away_bar} [bold]{av_display:<6}[/bold]",
+                classes="stat-row",
+            ))
+        return widgets
