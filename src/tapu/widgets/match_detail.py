@@ -50,11 +50,12 @@ def _sub_text(k: dict) -> str:
 
 
 def build_timeline(event: dict, summary: dict) -> list[str]:
-    """Goals + cards + subs from keyEvents in chronological order.
+    """Goals + cards from keyEvents in chronological order.
 
     Each row is `<icon>  <minute>'  <text>  <ABBR>` — the team acronym at the end
     disambiguates rows when both clubs use similar brand colors.
-    Returns markup-only strings — caller wraps them in a Static.
+    Substitutions are intentionally excluded; they get their own section so the
+    timeline stays focused on score-relevant events.
     """
     abbrs = _team_abbrs(event)
     items: list[tuple[float, str]] = []
@@ -77,15 +78,40 @@ def build_timeline(event: dict, summary: dict) -> list[str]:
         elif "red-card" in type_str:
             icon = "🟥"
             text = _participant_name(k) or k.get("shortText") or "Sent Off"
-        elif "substitution" in type_str or type_str == "sub":
-            icon = "🔄"
-            text = _sub_text(k)
         else:
-            continue
+            continue  # subs handled separately, unknown types dropped
 
         abbr = abbrs.get(team_id, "")
         abbr_suffix = f"  [dim]{abbr}[/dim]" if abbr else ""
         items.append((secs, f"{icon}  [dim]{clock_val:>5}'[/dim]  {text}{abbr_suffix}"))
+
+    items.sort(key=lambda x: x[0])
+    return [s for _, s in items]
+
+
+def build_substitutions(event: dict, summary: dict) -> list[str]:
+    """Substitution rows in chronological order, in the same row format as the timeline.
+
+    Same minute → ABBR layout the timeline uses, just rendered in a dedicated section
+    so subs (tactical) don't clutter the goals-and-cards narrative.
+    """
+    abbrs = _team_abbrs(event)
+    items: list[tuple[float, str]] = []
+    for k in summary.get("keyEvents", []) or []:
+        type_str = (k.get("type", {}) or {}).get("type", "")
+        if not ("substitution" in type_str or type_str == "sub"):
+            continue
+        team_id = str(k.get("team", {}).get("id", ""))
+        clock = k.get("clock", {}) or {}
+        clock_val = _format_clock_minute(clock.get("displayValue", ""))
+        try:
+            secs = float(clock.get("value") or 0)
+        except (TypeError, ValueError):
+            secs = 0.0
+        text = _sub_text(k)
+        abbr = abbrs.get(team_id, "")
+        abbr_suffix = f"  [dim]{abbr}[/dim]" if abbr else ""
+        items.append((secs, f"🔄  [dim]{clock_val:>5}'[/dim]  {text}{abbr_suffix}"))
 
     items.sort(key=lambda x: x[0])
     return [s for _, s in items]
@@ -369,6 +395,7 @@ class MatchDetail(Widget):
         header_widgets, state, home_id, home_abbr, away_abbr = self._build_header_widgets()
         live_widgets = self._build_live_widgets(state)
         timeline_widgets = self._build_timeline_widgets(state)
+        subs_widgets = self._build_subs_widgets(state)
         lineups_widgets = self._build_lineups_widgets()
         stats_widgets = self._build_stats_widgets(home_id, home_abbr, away_abbr)
 
@@ -376,6 +403,7 @@ class MatchDetail(Widget):
             with Horizontal(classes="three-col"):
                 with VerticalScroll(classes="col-side"):
                     yield from timeline_widgets
+                    yield from subs_widgets
                     yield from live_widgets
                 with VerticalScroll(classes="col-center"):
                     yield from header_widgets
@@ -386,6 +414,7 @@ class MatchDetail(Widget):
             yield from header_widgets
             yield from live_widgets
             yield from timeline_widgets
+            yield from subs_widgets
             yield from lineups_widgets
             yield from stats_widgets
 
@@ -475,6 +504,19 @@ class MatchDetail(Widget):
             else Static("[dim]  No events yet[/dim]", classes="timeline")
         )
         return [Static("📋  Timeline", classes="section-label"), body]
+
+    def _build_subs_widgets(self, state: str) -> list[Widget]:
+        # Substitutions live in their own section under the timeline so tactical
+        # changes don't dilute the goals/cards narrative above.
+        if state not in ("in", "post"):
+            return []
+        sub_lines = build_substitutions(self.event, self.summary)
+        if not sub_lines:
+            return []
+        return [
+            Static("🔄  Substitutions", classes="section-label"),
+            Static("\n".join(sub_lines), classes="timeline"),
+        ]
 
     def _build_lineups_widgets(self) -> list[Widget]:
         lineups = build_lineups(self.event, self.summary)

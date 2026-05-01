@@ -5,7 +5,7 @@ from tapu.config import League
 from tapu.widgets.bracket import BracketWidget
 from tapu.widgets.league_card import LeagueCard
 from tapu.widgets.match_card import MatchCard, _period_label, _status_label, format_live_status
-from tapu.widgets.match_detail import _extract_meta, build_lineups, build_timeline
+from tapu.widgets.match_detail import _extract_meta, build_lineups, build_substitutions, build_timeline
 from tapu.widgets.standings import StandingsTable
 
 
@@ -131,18 +131,37 @@ def _timeline_event_with_two_teams():
     }
 
 
-def test_build_timeline_orders_chronologically_across_event_types():
+def test_build_timeline_orders_goals_and_cards_chronologically():
+    # Substitutions are deliberately routed to build_substitutions, not the timeline.
     summary = {"keyEvents": [
         {"team": {"id": "1"}, "clock": {"value": 4500, "displayValue": "75"}, "scoringPlay": True, "shortText": "Pedri Goal", "type": {"type": "play"}},
         {"team": {"id": "2"}, "clock": {"value": 1800, "displayValue": "30"}, "type": {"type": "yellow-card"}, "participants": [{"athlete": {"displayName": "Vinícius"}}]},
         {"team": {"id": "1"}, "clock": {"value": 3840, "displayValue": "64"}, "type": {"type": "substitution"}, "participants": [{"athlete": {"displayName": "García"}}, {"athlete": {"displayName": "López"}}]},
     ]}
     lines = build_timeline(_timeline_event_with_two_teams(), summary)
-    assert len(lines) == 3
-    # Ordered by clock seconds: yellow card (1800) → sub (3840) → goal (4500)
+    assert len(lines) == 2  # sub excluded
     assert "Vinícius" in lines[0] and "🟨" in lines[0]
-    assert "García" in lines[1] and "🔄" in lines[1]
-    assert "Pedri" in lines[2] and "⚽" in lines[2]
+    assert "Pedri" in lines[1] and "⚽" in lines[1]
+
+
+def test_build_substitutions_only_returns_subs_in_order():
+    summary = {"keyEvents": [
+        {"team": {"id": "1"}, "clock": {"value": 4500, "displayValue": "75"}, "scoringPlay": True, "shortText": "Goal", "type": {"type": "play"}},
+        {"team": {"id": "2"}, "clock": {"value": 4320, "displayValue": "72"}, "type": {"type": "substitution"}, "participants": [{"athlete": {"displayName": "Pedri"}}, {"athlete": {"displayName": "Gavi"}}]},
+        {"team": {"id": "1"}, "clock": {"value": 3840, "displayValue": "64"}, "type": {"type": "substitution"}, "participants": [{"athlete": {"displayName": "García"}}, {"athlete": {"displayName": "López"}}]},
+    ]}
+    lines = build_substitutions(_timeline_event_with_two_teams(), summary)
+    assert len(lines) == 2
+    # Ordered by clock seconds: 64 then 72
+    assert "García" in lines[0] and "🔄" in lines[0] and "RMA" in lines[0]
+    assert "Pedri" in lines[1] and "BAR" in lines[1]
+
+
+def test_build_substitutions_empty_when_none():
+    summary = {"keyEvents": [
+        {"team": {"id": "1"}, "clock": {"value": 100, "displayValue": "2"}, "type": {"type": "yellow-card"}, "participants": [{"athlete": {"displayName": "X"}}]},
+    ]}
+    assert build_substitutions(_timeline_event_with_two_teams(), summary) == []
 
 
 def test_build_timeline_tags_each_row_with_team_abbr():
