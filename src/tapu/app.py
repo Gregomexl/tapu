@@ -1,4 +1,5 @@
 from textual.app import App
+from textual.binding import Binding, BindingType
 
 from tapu.api import ESPNClient
 from tapu.config import load_leagues
@@ -16,6 +17,11 @@ SPLASH = """\
 class TapuApp(App):
     TITLE = "Tapú"
     SUB_TITLE = "fútbol en tu terminal"
+
+    BINDINGS: list[BindingType] = [
+        Binding("g", "open_palette", "Go to league"),
+        Binding("?", "open_help", "Help"),
+    ]
 
     CSS = """
     Screen {
@@ -43,6 +49,26 @@ class TapuApp(App):
     async def on_unmount(self) -> None:
         await self.client.aclose()
 
-    def action_open_chat(self) -> None:
-        from tapu.screens.chat import ChatScreen
-        self.push_screen(ChatScreen())
+    def action_open_palette(self) -> None:
+        from tapu.screens.league_palette import LeaguePaletteScreen
+
+        def _on_league_selected(league) -> None:
+            if league is None:
+                return
+            from tapu.screens.league import LeagueScreen
+            from tapu.screens.match import MatchScreen
+            while len(self.screen_stack) > 1 and isinstance(
+                self.screen_stack[-1], (LeagueScreen, MatchScreen)
+            ):
+                self.pop_screen()
+            self.push_screen(LeagueScreen(self.client, league, {}))
+
+        self.push_screen(LeaguePaletteScreen(self.leagues), _on_league_selected)
+
+    def action_open_help(self) -> None:
+        from tapu.screens.help import HelpScreen
+        bindings = [
+            b for b in self.screen.BINDINGS
+            if isinstance(b, Binding)
+        ]
+        self.push_screen(HelpScreen(bindings))

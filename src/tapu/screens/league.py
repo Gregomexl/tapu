@@ -76,7 +76,6 @@ class LeagueScreen(Screen):
         Binding("b", "app.pop_screen", "Back", show=False),
         Binding("r", "refresh", "Refresh"),
         Binding("m", "more", "More"),
-        Binding("?", "app.open_chat", "Chat"),
         Binding("up", "app.focus_previous", "Prev", show=False),
         Binding("down", "app.focus_next", "Next", show=False),
     ]

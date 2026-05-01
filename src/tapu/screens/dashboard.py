@@ -19,7 +19,6 @@ class DashboardScreen(Screen):
     BINDINGS: ClassVar[list[BindingType]] = [
         Binding("r", "refresh", "Refresh"),
         Binding("q", "app.quit", "Quit"),
-        Binding("?", "app.open_chat", "Chat"),
         Binding("up", "app.focus_previous", "Prev", show=False),
         Binding("left", "app.focus_previous", "Prev", show=False),
         Binding("down", "app.focus_next", "Next", show=False),
