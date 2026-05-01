@@ -192,25 +192,31 @@ class LeagueScreen(Screen):
                 flash_ids.add(eid)
             self._prev_scores[eid] = new_scores
 
-        await pane.remove_children()
         if not events:
-            await pane.mount(Static("[dim]No matches[/dim]", classes="no-matches"))
+            with self.app.batch_update():
+                await pane.remove_children()
+                await pane.mount(Static("[dim]No matches[/dim]", classes="no-matches"))
             return
         widgets: list = []
         for day, day_evs in _group_events_by_day(events):
             widgets.append(Static(_day_label(day, today), classes="section-header"))
             for ev in day_evs:
                 widgets.append(MatchCard(ev, positions=self._positions, flash=ev["id"] in flash_ids))
-        await pane.mount(*widgets)
+        # Suspend repaints across the swap so the pane never renders empty mid-refresh.
+        with self.app.batch_update():
+            await pane.remove_children()
+            await pane.mount(*widgets)
 
     async def _render_standings(self, standings: dict) -> None:
         pane = self.query_one("#standings-pane", VerticalScroll)
-        await pane.remove_children()
         children = standings.get("children", [])
         if self.league.is_tournament and len(children) > 4:
-            await pane.mount(WCGroupsWidget(standings))
+            new_widget = WCGroupsWidget(standings)
         else:
-            await pane.mount(StandingsTable(standings, self.league.relegation_spots, self.league.promotion_spots))
+            new_widget = StandingsTable(standings, self.league.relegation_spots, self.league.promotion_spots)
+        with self.app.batch_update():
+            await pane.remove_children()
+            await pane.mount(new_widget)
 
     async def _load_main(self) -> None:
         today = date.today()

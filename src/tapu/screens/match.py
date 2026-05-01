@@ -125,7 +125,6 @@ class MatchScreen(Screen):
 
     async def _load_summary(self, summary: dict[str, Any] | None = None) -> None:
         scroll = self.query_one("#detail-scroll", VerticalScroll)
-        scroll.remove_children()
         try:
             if summary is None:
                 summary = await self.client.get_match_summary(
@@ -133,11 +132,16 @@ class MatchScreen(Screen):
                 )
             if not self._positions:
                 self._positions = await self._fetch_positions()
-            await scroll.mount(MatchDetail(self.event, summary, client=self.client, positions=self._positions))
+            new_widget = MatchDetail(self.event, summary, client=self.client, positions=self._positions)
+            with self.app.batch_update():
+                await scroll.remove_children()
+                await scroll.mount(new_widget)
         except Exception:
-            await scroll.mount(
-                Static("[red]Match details unavailable[/red]", classes="loading")
-            )
+            with self.app.batch_update():
+                await scroll.remove_children()
+                await scroll.mount(
+                    Static("[red]Match details unavailable[/red]", classes="loading")
+                )
 
     def _fingerprint(self, event: dict[str, Any], summary: dict[str, Any]) -> str:
         competitors = event["competitions"][0]["competitors"]
