@@ -112,7 +112,9 @@ def build_substitutions(event: dict, summary: dict) -> list[str]:
         text = _sub_text(k)
         abbr = abbrs.get(team_id, "")
         abbr_suffix = f"  [dim]{abbr}[/dim]" if abbr else ""
-        items.append((secs, f"[dim]{clock_val:>5}'[/dim]  {text}{abbr_suffix}"))
+        # No right-align padding on the clock — sub rows have no leading icon, so the
+        # row starts flush at the section's left edge.
+        items.append((secs, f"[dim]{clock_val}'[/dim]  {text}{abbr_suffix}"))
 
     items.sort(key=lambda x: x[0])
     return [s for _, s in items]
@@ -377,6 +379,10 @@ class MatchDetail(Widget):
         padding: 0 1 1 1;
         text-align: left;
     }
+    MatchDetail .subs-list {
+        padding: 0 1 1 0;
+        text-align: left;
+    }
     MatchDetail .lineup {
         padding: 0 1;
         margin: 0 0 1 0;
@@ -542,7 +548,7 @@ class MatchDetail(Widget):
             return []
         return [
             Static("── Substitutions", classes="section-label"),
-            Static("\n".join(sub_lines), classes="timeline"),
+            Static("\n".join(sub_lines), classes="subs-list"),
         ]
 
     def _build_lineups_widgets(self) -> list[Widget]:
