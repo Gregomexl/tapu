@@ -3,7 +3,7 @@ from typing import Any
 from rich.text import Text
 from textual.app import ComposeResult
 from textual.widget import Widget
-from textual.widgets import DataTable, Label
+from textual.widgets import DataTable, Label, Static
 
 
 def _stat(stats: list[dict], name: str) -> str:
@@ -21,6 +21,28 @@ def _form_dots(form_str: str) -> str:
         if color:
             parts.append(f"[{color}]●[/{color}]")
     return " ".join(parts)
+
+
+_LEGEND_ZONES: list[tuple[str, str, list[str]]] = [
+    ("Champions League", "cyan", ["champion", "advance", "round of"]),
+    ("Europa League", "green", ["europa", "sudamericana"]),
+    ("Conference League", "yellow", ["conference", "best"]),
+    ("Relegation", "red", ["relegat", "eliminat"]),
+]
+
+
+def _legend_items(entries: list[dict]) -> list[tuple[str, str]]:
+    """Return (label, color) for competition zones present in this table."""
+    descs = {
+        entry.get("note", {}).get("description", "").lower()
+        for entry in entries
+        if entry.get("note")
+    }
+    result = []
+    for label, color, keywords in _LEGEND_ZONES:
+        if any(kw in d for d in descs for kw in keywords):
+            result.append((label, color))
+    return result
 
 
 def _row_style(
@@ -110,6 +132,15 @@ class StandingsTable(Widget):
     StandingsTable {
         height: auto;
     }
+    StandingsTable .table-header {
+        color: $text;
+        text-style: bold;
+        padding: 0 0 1 0;
+    }
+    StandingsTable .season-label {
+        color: $text-muted;
+        text-style: none;
+    }
     StandingsTable DataTable {
         height: auto;
         max-height: 28;
@@ -120,6 +151,10 @@ class StandingsTable(Widget):
         text-style: bold;
         padding: 1 0 0 0;
     }
+    StandingsTable .legend {
+        padding: 1 0 0 0;
+        color: $text-muted;
+    }
     """
 
     def __init__(
@@ -127,17 +162,38 @@ class StandingsTable(Widget):
         data: dict[str, Any],
         relegation_spots: int = 0,
         promotion_spots: int = 0,
+        league_name: str = "",
+        season: str = "",
     ) -> None:
         super().__init__()
         self._data = data
         self._relegation_spots = relegation_spots
         self._promotion_spots = promotion_spots
+        self._league_name = league_name
+        self._season = season
 
     @property
     def row_count(self) -> int:
         return sum(t.row_count for t in self.query(DataTable))
 
+    def _all_entries(self) -> list[dict]:
+        children = self._data.get("children", [])
+        if children:
+            entries: list[dict] = []
+            for child in children:
+                entries.extend(child.get("standings", {}).get("entries", []))
+            return entries
+        return self._data.get("standings", {}).get("entries", [])
+
     def compose(self) -> ComposeResult:
+        # Header: "LEAGUE TABLE  Season YYYY/YY"
+        if self._league_name:
+            season_part = f"  [dim]{self._season}[/dim]" if self._season else ""
+            yield Static(
+                f"[bold]{self._league_name.upper()} TABLE[/bold]{season_part}",
+                classes="table-header",
+            )
+
         children = self._data.get("children", [])
         if len(children) > 1:
             for child in children:
@@ -155,6 +211,12 @@ class StandingsTable(Widget):
             table = self._make_table()
             _fill_table(table, entries, self._relegation_spots, self._promotion_spots)
             yield table
+
+        # Legend: only show zones present in the data
+        legend = _legend_items(self._all_entries())
+        if legend:
+            parts = [f"[{color}]■[/{color}] {label}" for label, color in legend]
+            yield Static("  ".join(parts), classes="legend")
 
     def _make_table(self) -> DataTable:
         table: DataTable = DataTable()

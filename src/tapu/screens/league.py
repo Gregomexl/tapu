@@ -103,6 +103,7 @@ class LeagueScreen(Screen):
         Binding("down", "app.focus_next", "Next", show=False),
         Binding("f", "cycle_filter", "Filter", show=False),
         Binding("/", "focus_search", "Search", show=False),
+        Binding("g", "app.open_palette", "Go to league"),
     ]
 
     DEFAULT_CSS = """
@@ -266,7 +267,7 @@ class LeagueScreen(Screen):
         for day, day_evs in _group_events_by_day(events):
             widgets.append(Static(_day_label(day, today), classes="section-header"))
             for ev in day_evs:
-                widgets.append(MatchCard(ev, positions=self._positions, flash=ev["id"] in flash_ids))
+                widgets.append(MatchCard(ev, client=self.client, positions=self._positions, flash=ev["id"] in flash_ids))
         with self.app.batch_update():
             await pane.remove_children()
             await pane.mount(*widgets)
@@ -277,7 +278,16 @@ class LeagueScreen(Screen):
         if self.league.is_tournament and len(children) > 4:
             new_widget = WCGroupsWidget(standings)
         else:
-            new_widget = StandingsTable(standings, self.league.relegation_spots, self.league.promotion_spots)
+            season_raw = standings.get("season", {}).get("displayName", "")
+            # ESPN season displayName is often "2025-26 La Liga" — extract the year range only
+            season = season_raw.split()[0] if season_raw else ""
+            new_widget = StandingsTable(
+                standings,
+                self.league.relegation_spots,
+                self.league.promotion_spots,
+                league_name=self.league.full_name,
+                season=season,
+            )
         with self.app.batch_update():
             await pane.remove_children()
             await pane.mount(new_widget)
