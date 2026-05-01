@@ -89,7 +89,7 @@ class DashboardScreen(Screen):
     async def _bg_refresh(self) -> None:
         await self._load_all(show_loader=False)
 
-    async def _load_all(self, show_loader: bool = True) -> None:
+    async def _load_all(self, show_loader: bool = True, manual: bool = False) -> None:
         loader = self.query_one("#loader", LoadingIndicator)
         grid = self.query_one("#cards-grid", ItemGrid)
 
@@ -119,6 +119,10 @@ class DashboardScreen(Screen):
         self._last_refresh = datetime.now()
         self._update_subtitle()
 
+        if manual:
+            updated = sum(1 for sb in self._scoreboards.values() if sb)
+            self.app.notify(f"Scores refreshed · {updated} leagues updated", timeout=4)
+
     def _update_subtitle(self) -> None:
         if self._last_refresh is None:
             return
@@ -133,7 +137,7 @@ class DashboardScreen(Screen):
     def action_refresh(self) -> None:
         self.client.clear_cache()
         self._scoreboards.clear()
-        self.run_worker(self._load_all())
+        self.run_worker(self._load_all(manual=True))
 
     def on_league_card_selected(self, message: LeagueCard.Selected) -> None:
         from tapu.screens.league import LeagueScreen
