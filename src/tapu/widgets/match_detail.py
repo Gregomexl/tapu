@@ -89,14 +89,19 @@ def build_timeline(event: dict, summary: dict) -> list[str]:
     return [s for _, s in items]
 
 
-def build_substitutions(event: dict, summary: dict) -> list[str]:
-    """Substitution rows in chronological order, in the same row format as the timeline.
+def build_subs_split(event: dict, summary: dict) -> tuple[list[str], list[str]]:
+    """Substitutions split into (home_rows, away_rows) for a symmetric two-column layout.
 
-    Same minute → ABBR layout the timeline uses, just rendered in a dedicated section
-    so subs (tactical) don't clutter the goals-and-cards narrative.
+    Home rows are right-aligned (name → minute) and away rows are left-aligned
+    (minute → name) so they mirror around a central separator. Each list is sorted
+    chronologically.
     """
-    abbrs = _team_abbrs(event)
-    items: list[tuple[float, str]] = []
+    home_id = next(
+        (str(c.get("team", {}).get("id", "")) for c in event.get("competitions", [{}])[0].get("competitors", []) if c.get("homeAway") == "home"),
+        "",
+    )
+    home_subs: list[tuple[float, str]] = []
+    away_subs: list[tuple[float, str]] = []
     for k in summary.get("keyEvents", []) or []:
         type_str = (k.get("type", {}) or {}).get("type", "")
         if not ("substitution" in type_str or type_str == "sub"):
@@ -109,12 +114,13 @@ def build_substitutions(event: dict, summary: dict) -> list[str]:
         except (TypeError, ValueError):
             secs = 0.0
         text = _sub_text(k)
-        abbr = abbrs.get(team_id, "")
-        abbr_suffix = f"  [dim]{abbr}[/dim]" if abbr else ""
-        items.append((secs, f"[dim]{clock_val:>5}'[/dim]  {text}{abbr_suffix}"))
-
-    items.sort(key=lambda x: x[0])
-    return [s for _, s in items]
+        if team_id == home_id:
+            home_subs.append((secs, f"{text}  [dim]{clock_val}'[/dim]"))
+        else:
+            away_subs.append((secs, f"[dim]{clock_val}'[/dim]  {text}"))
+    home_subs.sort(key=lambda x: x[0])
+    away_subs.sort(key=lambda x: x[0])
+    return [s for _, s in home_subs], [s for _, s in away_subs]
 
 
 def _format_clock_minute(raw: str) -> str:
@@ -381,6 +387,24 @@ class MatchDetail(Widget):
         margin: 0 0 1 0;
         text-align: left;
     }
+    MatchDetail .subs-row {
+        height: auto;
+        margin: 0 0 1 0;
+    }
+    MatchDetail .subs-home {
+        width: 1fr;
+        text-align: right;
+        padding: 0 1 0 1;
+    }
+    MatchDetail .subs-sep {
+        width: 1;
+        color: $surface-lighten-2;
+    }
+    MatchDetail .subs-away {
+        width: 1fr;
+        text-align: left;
+        padding: 0 1 0 1;
+    }
     MatchDetail .venue-line {
         text-align: center;
         color: $text-muted;
@@ -532,15 +556,24 @@ class MatchDetail(Widget):
 
     def _build_subs_widgets(self, state: str) -> list[Widget]:
         # Substitutions live in their own section under the timeline so tactical
-        # changes don't dilute the goals/cards narrative above.
+        # changes don't dilute the goals/cards narrative above. Symmetric two-column
+        # layout mirrors home (right-aligned) ↔ away (left-aligned) around a central rule.
         if state not in ("in", "post"):
             return []
-        sub_lines = build_substitutions(self.event, self.summary)
-        if not sub_lines:
+        home_subs, away_subs = build_subs_split(self.event, self.summary)
+        if not home_subs and not away_subs:
             return []
+        rows = max(len(home_subs), len(away_subs), 1)
+        home_subs += [""] * (rows - len(home_subs))
+        away_subs += [""] * (rows - len(away_subs))
         return [
             Static("── Substitutions", classes="section-label"),
-            Static("\n".join(sub_lines), classes="timeline"),
+            Horizontal(
+                Static("\n".join(home_subs), classes="subs-home"),
+                Static("│\n" * rows, classes="subs-sep"),
+                Static("\n".join(away_subs), classes="subs-away"),
+                classes="subs-row",
+            ),
         ]
 
     def _build_lineups_widgets(self) -> list[Widget]:
