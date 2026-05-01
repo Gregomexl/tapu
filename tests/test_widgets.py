@@ -3,8 +3,60 @@ from textual.app import App, ComposeResult
 from tapu.config import League
 from tapu.widgets.bracket import BracketWidget
 from tapu.widgets.league_card import LeagueCard
-from tapu.widgets.match_card import MatchCard
+from tapu.widgets.match_card import MatchCard, _status_label
 from tapu.widgets.standings import StandingsTable
+
+
+def test_status_label_live():
+    event = {
+        "status": {
+            "type": {"name": "STATUS_IN_PROGRESS", "state": "in"},
+            "displayClock": "67:00",
+            "period": 2,
+        }
+    }
+    label = _status_label(event)
+    assert "LIVE" in label
+    assert "67:00" in label
+    assert "red" in label or "bold" in label
+
+
+def test_status_label_ht():
+    event = {
+        "status": {
+            "type": {"name": "STATUS_HALFTIME", "state": "in"},
+            "displayClock": "45:00",
+            "period": 1,
+        }
+    }
+    label = _status_label(event)
+    assert "HT" in label
+    assert "yellow" in label
+
+
+def test_status_label_ft():
+    event = {
+        "status": {
+            "type": {"name": "STATUS_FINAL", "state": "post", "detail": "FT"},
+            "displayClock": "90:00",
+        },
+        "date": "",
+    }
+    label = _status_label(event)
+    assert "FT" in label
+    assert "dim" in label
+
+
+def test_status_label_upcoming():
+    event = {
+        "status": {
+            "type": {"name": "STATUS_SCHEDULED", "state": "pre", "detail": ""},
+        },
+        "date": "2026-05-01T19:00:00Z",
+    }
+    label = _status_label(event)
+    assert "cyan" in label
+    assert len(label) > 10  # has actual time content
 
 
 class _LeagueCardTestApp(App):

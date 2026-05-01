@@ -25,7 +25,7 @@ def _format_local_time(date_str: str) -> str:
         return date_str
 
 
-def _status_label(event: dict) -> str:
+def _status_label(event: dict, pulse_on: bool = True) -> str:
     status = event["status"]["type"]
     state = status.get("state", "pre")
     if state == "in":
@@ -33,16 +33,17 @@ def _status_label(event: dict) -> str:
         if "HALFTIME" in name.upper() or "HALF_TIME" in name.upper():
             return "[yellow]● HT[/yellow]"
         period = event["status"].get("period", 1)
+        clock = ""
         if period >= 2:
             clock = event["status"].get("displayClock", "")
-            suffix = f" {clock}" if clock else ""
-            return f"[green]● LIVE{suffix}[/green]"
-        return "[green]● LIVE[/green]"
+        suffix = f" {clock}" if clock else ""
+        dot = "[green]●[/green]" if pulse_on else " "
+        return f"{dot} [bold red]LIVE{suffix}[/bold red]"
     if state == "post":
         return f"[dim]{status.get('detail', 'FT')}[/dim]"
     date_str = event.get("date", "")
     local_time = _format_local_time(date_str) if date_str else status.get("detail", "")
-    return f"[dim]{local_time}[/dim]"
+    return f"[cyan]{local_time}[/cyan]"
 
 
 class MatchCard(Widget, can_focus=True):
