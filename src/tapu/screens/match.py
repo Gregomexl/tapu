@@ -113,11 +113,15 @@ class MatchScreen(Screen):
             for child in children:
                 entries = child.get("standings", {}).get("entries", [])
                 for i, entry in enumerate(entries, 1):
-                    positions[str(entry["team"]["id"])] = i
+                    team_id = entry.get("team", {}).get("id")
+                    if team_id is not None:
+                        positions[str(team_id)] = i
             if not positions:
                 entries = standings.get("standings", {}).get("entries", [])
                 for i, entry in enumerate(entries, 1):
-                    positions[str(entry["team"]["id"])] = i
+                    team_id = entry.get("team", {}).get("id")
+                    if team_id is not None:
+                        positions[str(team_id)] = i
             return positions
         except Exception:
             return {}

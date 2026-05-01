@@ -40,6 +40,22 @@ def test_parse_positions_empty():
     assert screen._parse_positions({}) == {}
 
 
+def test_parse_positions_skips_entries_without_team_id():
+    # Some standings payloads (older endpoints, certain leagues) come back without team.id.
+    # Don't blow up — just skip those rows and return whatever we could parse.
+    standings = {
+        "standings": {
+            "entries": [
+                {"team": {"displayName": "Real Madrid", "abbreviation": "RMA"}},
+                {"team": {"id": "20", "displayName": "Barça", "abbreviation": "BAR"}},
+                {"team": {"abbreviation": "ATM"}},
+            ]
+        }
+    }
+    screen = _make_screen()
+    assert screen._parse_positions(standings) == {"20": 2}
+
+
 def test_get_event_scores_returns_home_away():
     event = {
         "id": "123",

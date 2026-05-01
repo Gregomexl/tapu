@@ -173,10 +173,14 @@ class LeagueScreen(Screen):
         positions: dict[str, int] = {}
         for child in standings.get("children", []):
             for i, entry in enumerate(child.get("standings", {}).get("entries", []), 1):
-                positions[str(entry["team"]["id"])] = i
+                team_id = entry.get("team", {}).get("id")
+                if team_id is not None:
+                    positions[str(team_id)] = i
         if not positions:
             for i, entry in enumerate(standings.get("standings", {}).get("entries", []), 1):
-                positions[str(entry["team"]["id"])] = i
+                team_id = entry.get("team", {}).get("id")
+                if team_id is not None:
+                    positions[str(team_id)] = i
         return positions
 
     async def _render_matches(self, sb: dict) -> None:
