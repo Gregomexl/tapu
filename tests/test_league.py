@@ -1,4 +1,4 @@
-from tapu.screens.league import LeagueScreen
+from tapu.screens.league import LeagueScreen, _get_event_scores
 
 
 def _make_screen():
@@ -38,3 +38,29 @@ def test_parse_positions_flat():
 def test_parse_positions_empty():
     screen = _make_screen()
     assert screen._parse_positions({}) == {}
+
+
+def test_get_event_scores_returns_home_away():
+    event = {
+        "id": "123",
+        "competitions": [{
+            "competitors": [
+                {"homeAway": "home", "score": "2"},
+                {"homeAway": "away", "score": "1"},
+            ]
+        }]
+    }
+    assert _get_event_scores(event) == ("2", "1")
+
+
+def test_get_event_scores_missing_score():
+    event = {
+        "id": "456",
+        "competitions": [{
+            "competitors": [
+                {"homeAway": "home"},
+                {"homeAway": "away"},
+            ]
+        }]
+    }
+    assert _get_event_scores(event) == ("", "")
