@@ -97,10 +97,10 @@ class DashboardScreen(Screen):
             loader.display = True
 
         results = await asyncio.gather(
-            *[self.client.get_scoreboard(l.slug) for l in self.leagues],
+            *[self.client.get_scoreboard(league.slug) for league in self.leagues],
             return_exceptions=True,
         )
-        for league, result in zip(self.leagues, results):
+        for league, result in zip(self.leagues, results, strict=False):
             if not isinstance(result, Exception):
                 self._scoreboards[league.slug] = result
 

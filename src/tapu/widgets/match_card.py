@@ -108,7 +108,7 @@ class MatchCard(Widget, can_focus=True):
         name = status_type.get("name", "")
         self._is_ht = state == "in" and ("HALFTIME" in name.upper() or "HALF_TIME" in name.upper())
         self.is_live = state == "in"
-        if self.is_live:
+        if self.is_live and not self._is_ht:
             self.add_class("live")
 
     def _render_line1(self) -> str:
@@ -130,7 +130,11 @@ class MatchCard(Widget, can_focus=True):
             self.add_class("--flashing")
             self.set_timer(3.0, lambda: self.remove_class("--flashing"))
         if self.is_live and not self._is_ht:
-            self.set_interval(0.7, self._toggle_pulse)
+            self._pulse_timer = self.set_interval(0.7, self._toggle_pulse)
+
+    def on_unmount(self) -> None:
+        if hasattr(self, "_pulse_timer"):
+            self._pulse_timer.stop()
 
     def _toggle_pulse(self) -> None:
         self._pulse_on = not self._pulse_on
