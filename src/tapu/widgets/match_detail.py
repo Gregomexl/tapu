@@ -157,14 +157,22 @@ def _format_lineup_section(team_roster: dict) -> list[str]:
     """One team's lineup block: team name + formation header, starting XI rows, and a
     one-line bench summary. Returns markup-ready lines (no enclosing widget).
     """
-    team_name = team_roster.get("team", {}).get("displayName", "") or ""
+    team = team_roster.get("team", {}) or {}
+    team_name = team.get("displayName", "") or ""
+    color = team.get("color", "") or ""
+    hex_color = f"#{color}" if len(color) == 6 else None
+    badge = (
+        f"[on {hex_color}][{hex_color}]  [/{hex_color}][/on {hex_color}] "
+        if hex_color
+        else ""
+    )
     formation = _format_formation(team_roster.get("formation"))
     roster = team_roster.get("roster") or []
     starters = [p for p in roster if p.get("starter")]
     bench = [p for p in roster if not p.get("starter")]
 
     lines: list[str] = []
-    header = f"[bold]{team_name}[/bold]"
+    header = f"{badge}[bold]{team_name}[/bold]"
     if formation:
         header += f"  [dim]{formation}[/dim]"
     lines.append(header)

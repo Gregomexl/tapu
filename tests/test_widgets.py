@@ -250,6 +250,17 @@ def test_build_lineups_renders_formation_in_header():
     assert "4-3-2-1" in away_lines[0]
 
 
+def test_build_lineups_prepends_color_badge_to_team_header():
+    event = _timeline_event_with_two_teams()
+    summary = _lineup_summary()
+    # _lineup_summary() doesn't carry team.color; inject one for this test.
+    summary["rosters"][0]["team"]["color"] = "FFFFFF"
+    summary["rosters"][1]["team"]["color"] = "A50044"
+    home_lines, away_lines = build_lineups(event, summary)
+    assert "#FFFFFF" in home_lines[0]
+    assert "#A50044" in away_lines[0]
+
+
 def test_build_lineups_separates_starters_from_bench():
     event = _timeline_event_with_two_teams()
     home_lines, _ = build_lineups(event, _lineup_summary())
