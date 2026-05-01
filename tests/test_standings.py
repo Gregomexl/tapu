@@ -1,7 +1,53 @@
 import pytest
 from textual.app import App, ComposeResult
 
-from tapu.widgets.standings import StandingsTable, _form_dots
+from tapu.widgets.standings import StandingsTable, _form_dots, _legend_items
+
+
+def _entry_with_note(desc: str) -> dict:
+    return {"team": {"abbreviation": "TST"}, "stats": [], "note": {"description": desc}}
+
+
+def test_legend_uses_actual_api_description():
+    entries = [_entry_with_note("UEFA Champions League")]
+    items = _legend_items(entries)
+    assert items == [("UEFA Champions League", "cyan")]
+
+
+def test_legend_advance_in_tournament_shows_advance_label_not_champions():
+    entries = [_entry_with_note("Advance to Knockout Phase")]
+    items = _legend_items(entries)
+    # In a tournament context, "advance" should show the actual description
+    assert items == [("Advance to Knockout Phase", "cyan")]
+
+
+def test_legend_multiple_zones_ordered_by_color():
+    entries = [
+        _entry_with_note("UEFA Champions League"),
+        _entry_with_note("Relegated"),
+        _entry_with_note("UEFA Europa League"),
+    ]
+    items = _legend_items(entries)
+    labels = [label for label, _ in items]
+    # cyan before green before red
+    assert labels.index("UEFA Champions League") < labels.index("UEFA Europa League")
+    assert labels.index("UEFA Europa League") < labels.index("Relegated")
+
+
+def test_legend_empty_when_no_notes():
+    entries = [{"team": {"abbreviation": "TST"}, "stats": []}]
+    assert _legend_items(entries) == []
+
+
+def test_legend_deduplicates_same_color():
+    # Multiple "advance" entries should produce only one cyan legend item
+    entries = [
+        _entry_with_note("Advance to Round of 16"),
+        _entry_with_note("Advance to Knockout Phase"),
+    ]
+    items = _legend_items(entries)
+    cyan_items = [item for item in items if item[1] == "cyan"]
+    assert len(cyan_items) == 1
 
 
 def _standings_data(with_form: bool) -> dict:

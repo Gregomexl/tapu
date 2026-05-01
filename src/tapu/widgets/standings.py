@@ -23,25 +23,44 @@ def _form_dots(form_str: str) -> str:
     return " ".join(parts)
 
 
-_LEGEND_ZONES: list[tuple[str, str, list[str]]] = [
-    ("Champions League", "cyan", ["champion", "advance", "round of"]),
-    ("Europa League", "green", ["europa", "sudamericana"]),
-    ("Conference League", "yellow", ["conference", "best"]),
-    ("Relegation", "red", ["relegat", "eliminat"]),
-]
+def _note_color(desc: str) -> str | None:
+    """Map a note description to the same color used by _row_style."""
+    d = desc.lower()
+    if "relegat" in d or "eliminat" in d:
+        return "red"
+    if "champion" in d or "advance" in d or "round of" in d:
+        return "cyan"
+    if "europa" in d or "sudamericana" in d:
+        return "green"
+    if "conference" in d or "best" in d:
+        return "yellow"
+    return None
 
 
 def _legend_items(entries: list[dict]) -> list[tuple[str, str]]:
-    """Return (label, color) for competition zones present in this table."""
-    descs = {
-        entry.get("note", {}).get("description", "").lower()
-        for entry in entries
-        if entry.get("note")
-    }
+    """Return (label, color) for each distinct competition zone in this table.
+
+    Labels are taken directly from the ESPN API description so they accurately
+    reflect the context — e.g. 'Advance to Knockout Phase' in a tournament
+    rather than a hardcoded 'Champions League' label.
+    """
+    # First description seen per color wins as the legend label
+    seen: dict[str, str] = {}
+    for entry in entries:
+        note = entry.get("note")
+        if not note:
+            continue
+        desc = note.get("description", "").strip()
+        if not desc:
+            continue
+        color = _note_color(desc)
+        if color and color not in seen:
+            seen[color] = desc
+    # Return in a stable order matching visual importance
     result = []
-    for label, color, keywords in _LEGEND_ZONES:
-        if any(kw in d for d in descs for kw in keywords):
-            result.append((label, color))
+    for color in ("cyan", "green", "yellow", "red"):
+        if color in seen:
+            result.append((seen[color], color))
     return result
 
 
