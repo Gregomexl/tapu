@@ -124,8 +124,8 @@ def _timeline_event_with_two_teams():
     return {
         "competitions": [{
             "competitors": [
-                {"team": {"id": "1", "color": "FF0000"}, "homeAway": "home"},
-                {"team": {"id": "2", "color": "0000FF"}, "homeAway": "away"},
+                {"team": {"id": "1", "abbreviation": "RMA", "color": "FF0000"}, "homeAway": "home"},
+                {"team": {"id": "2", "abbreviation": "BAR", "color": "0000FF"}, "homeAway": "away"},
             ]
         }]
     }
@@ -145,12 +145,26 @@ def test_build_timeline_orders_chronologically_across_event_types():
     assert "Pedri" in lines[2] and "⚽" in lines[2]
 
 
-def test_build_timeline_tags_each_row_with_team_color():
+def test_build_timeline_tags_each_row_with_team_abbr():
     summary = {"keyEvents": [
         {"team": {"id": "1"}, "clock": {"value": 600, "displayValue": "10"}, "scoringPlay": True, "shortText": "Goal", "type": {}},
+        {"team": {"id": "2"}, "clock": {"value": 1200, "displayValue": "20"}, "scoringPlay": True, "shortText": "Goal", "type": {}},
+    ]}
+    lines = build_timeline(_timeline_event_with_two_teams(), summary)
+    assert "RMA" in lines[0]
+    assert "BAR" in lines[1]
+    # No color blocks anymore — the abbreviation is the disambiguator.
+    assert "#FF0000" not in lines[0]
+
+
+def test_build_timeline_strips_stoppage_apostrophes_from_minute():
+    summary = {"keyEvents": [
+        {"team": {"id": "1"}, "clock": {"value": 5520, "displayValue": "90'+2'"}, "scoringPlay": True, "shortText": "Goal", "type": {}},
     ]}
     line = build_timeline(_timeline_event_with_two_teams(), summary)[0]
-    assert "#FF0000" in line  # home team color baked into the badge
+    # '90'+2'' would be a double-apostrophe disaster — must render as '90+2''.
+    assert "90+2" in line
+    assert "''" not in line
 
 
 def test_build_timeline_drops_unknown_event_types():
@@ -227,6 +241,20 @@ def test_build_lineups_separates_starters_from_bench():
 def test_build_lineups_empty_when_no_rosters():
     assert build_lineups(_timeline_event_with_two_teams(), {}) == []
     assert build_lineups(_timeline_event_with_two_teams(), {"rosters": []}) == []
+
+
+def test_format_live_status_normalizes_stoppage_clock():
+    # ESPN returns "90'+5'" with embedded apostrophes — render it as "90+5'" not "90'+5''".
+    event = {
+        "status": {
+            "type": {"name": "STATUS_SECOND_HALF", "state": "in"},
+            "displayClock": "90'+5'",
+            "period": 2,
+        }
+    }
+    label = format_live_status(event, show_clock=True)
+    assert "90+5'" in label
+    assert "90'+5''" not in label
 
 
 def test_format_live_status_ht_overrides_clock_mode():

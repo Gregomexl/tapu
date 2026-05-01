@@ -15,21 +15,20 @@ def _get_team(competitors: list[dict], home_away: str) -> dict:
     return competitors[0]
 
 
-def _team_colors(event: dict) -> dict[str, str | None]:
-    """team_id (str) → '#hex' or None — used to tag timeline rows with a team-color block."""
-    out: dict[str, str | None] = {}
+def _team_abbrs(event: dict) -> dict[str, str]:
+    """team_id (str) → club abbreviation (e.g. 'RMA', 'BAR'). Falls back to shortDisplayName.
+
+    Used to tag timeline rows with the club acronym at the end. Replaces the previous
+    team-color block — same teams often share visually-similar palette colors (Real
+    Madrid / Sevilla / Espanyol are all white-and-red), making the badge ambiguous.
+    """
+    out: dict[str, str] = {}
     for c in event.get("competitions", [{}])[0].get("competitors", []):
         team_id = str(c.get("team", {}).get("id", ""))
-        color = c.get("team", {}).get("color", "")
+        abbr = c.get("team", {}).get("abbreviation") or c.get("team", {}).get("shortDisplayName") or ""
         if team_id:
-            out[team_id] = f"#{color}" if color and len(color) == 6 else None
+            out[team_id] = abbr
     return out
-
-
-def _color_badge(hex_color: str | None) -> str:
-    if not hex_color:
-        return "  "
-    return f"[on {hex_color}][{hex_color}]  [/{hex_color}][/on {hex_color}]"
 
 
 def _participant_name(k: dict, idx: int = 0) -> str:
@@ -52,16 +51,16 @@ def _sub_text(k: dict) -> str:
 def build_timeline(event: dict, summary: dict) -> list[str]:
     """Goals + cards + subs from keyEvents in chronological order.
 
-    Each row is `<icon>  <minute>'  <team-color block>  <text>` so the eye scans the
-    color column to read team-by-team without needing a left/right split.
+    Each row is `<icon>  <minute>'  <text>  <ABBR>` — the team acronym at the end
+    disambiguates rows when both clubs use similar brand colors.
     Returns markup-only strings — caller wraps them in a Static.
     """
-    colors = _team_colors(event)
+    abbrs = _team_abbrs(event)
     items: list[tuple[float, str]] = []
     for k in summary.get("keyEvents", []) or []:
         team_id = str(k.get("team", {}).get("id", ""))
         clock = k.get("clock", {}) or {}
-        clock_val = (clock.get("displayValue", "") or "").rstrip("'")
+        clock_val = _format_clock_minute(clock.get("displayValue", ""))
         try:
             secs = float(clock.get("value") or 0)
         except (TypeError, ValueError):
@@ -83,11 +82,23 @@ def build_timeline(event: dict, summary: dict) -> list[str]:
         else:
             continue
 
-        badge = _color_badge(colors.get(team_id))
-        items.append((secs, f"{icon}  [dim]{clock_val:>4}'[/dim]  {badge}  {text}"))
+        abbr = abbrs.get(team_id, "")
+        abbr_suffix = f"  [dim]{abbr}[/dim]" if abbr else ""
+        items.append((secs, f"{icon}  [dim]{clock_val:>5}'[/dim]  {text}{abbr_suffix}"))
 
     items.sort(key=lambda x: x[0])
     return [s for _, s in items]
+
+
+def _format_clock_minute(raw: str) -> str:
+    """ESPN returns clock minutes in mixed shapes:
+       - '67' (plain), '67:23' (mm:ss for some leagues), '90'+5'' (stoppage with apostrophes).
+    Normalize to a single trailing-apostrophe-free token: '67', '90+5'. The caller adds the
+    closing apostrophe in the rendered string.
+    """
+    if not raw:
+        return ""
+    return raw.replace("'", "").strip()
 
 
 def _format_formation(formation: Any) -> str:

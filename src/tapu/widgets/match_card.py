@@ -60,7 +60,9 @@ def format_live_status(event: dict, pulse_on: bool = True, *, show_clock: bool =
         if is_ht:
             return f"{dot} [bold yellow]HT[/bold yellow]"
         if show_clock:
-            clock = event["status"].get("displayClock", "")
+            # ESPN returns stoppage time as "90'+5'" (with embedded apostrophes).
+            # Strip them before rendering so we don't end up with "90'+5''" double-apostrophes.
+            clock = (event["status"].get("displayClock", "") or "").replace("'", "").strip()
             suffix = f" {clock}'" if clock else ""
         else:
             period = _period_label(event)
