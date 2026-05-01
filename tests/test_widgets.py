@@ -5,7 +5,7 @@ from tapu.config import League
 from tapu.widgets.bracket import BracketWidget
 from tapu.widgets.league_card import LeagueCard
 from tapu.widgets.match_card import MatchCard, _period_label, _status_label, format_live_status
-from tapu.widgets.match_detail import _extract_meta, build_lineups, build_subs_split, build_timeline
+from tapu.widgets.match_detail import _extract_meta, build_lineups, build_substitutions, build_timeline
 from tapu.widgets.standings import StandingsTable
 
 
@@ -144,33 +144,26 @@ def test_build_timeline_orders_goals_and_cards_chronologically():
     assert "Pedri" in lines[1] and "⚽" in lines[1]
 
 
-def test_build_subs_split_routes_to_home_and_away_columns():
+def test_build_substitutions_only_returns_subs_in_order():
     summary = {"keyEvents": [
-        {"team": {"id": "1"}, "clock": {"value": 3840, "displayValue": "64"}, "type": {"type": "substitution"}, "participants": [{"athlete": {"displayName": "García"}}, {"athlete": {"displayName": "López"}}]},
+        {"team": {"id": "1"}, "clock": {"value": 4500, "displayValue": "75"}, "scoringPlay": True, "shortText": "Goal", "type": {"type": "play"}},
         {"team": {"id": "2"}, "clock": {"value": 4320, "displayValue": "72"}, "type": {"type": "substitution"}, "participants": [{"athlete": {"displayName": "Pedri"}}, {"athlete": {"displayName": "Gavi"}}]},
+        {"team": {"id": "1"}, "clock": {"value": 3840, "displayValue": "64"}, "type": {"type": "substitution"}, "participants": [{"athlete": {"displayName": "García"}}, {"athlete": {"displayName": "López"}}]},
     ]}
-    home, away = build_subs_split(_timeline_event_with_two_teams(), summary)
-    assert len(home) == 1 and "García" in home[0]
-    assert len(away) == 1 and "Pedri" in away[0]
-    # Mirror layout: home row ends with the minute, away row starts with it.
-    assert home[0].endswith("64'[/dim]")
-    assert away[0].startswith("[dim]")
+    lines = build_substitutions(_timeline_event_with_two_teams(), summary)
+    assert len(lines) == 2
+    # Ordered by clock seconds: 64 then 72
+    assert "García" in lines[0] and "RMA" in lines[0]
+    assert "Pedri" in lines[1] and "BAR" in lines[1]
+    # No emoji icon on rows — section header carries the label.
+    assert "🔄" not in lines[0]
 
 
-def test_build_subs_split_orders_each_column_chronologically():
-    summary = {"keyEvents": [
-        {"team": {"id": "1"}, "clock": {"value": 5400, "displayValue": "90"}, "type": {"type": "substitution"}, "participants": [{"athlete": {"displayName": "B"}}, {"athlete": {"displayName": "C"}}]},
-        {"team": {"id": "1"}, "clock": {"value": 1800, "displayValue": "30"}, "type": {"type": "substitution"}, "participants": [{"athlete": {"displayName": "X"}}, {"athlete": {"displayName": "Y"}}]},
-    ]}
-    home, _ = build_subs_split(_timeline_event_with_two_teams(), summary)
-    assert "X" in home[0] and "B" in home[1]
-
-
-def test_build_subs_split_empty_when_no_subs():
+def test_build_substitutions_empty_when_none():
     summary = {"keyEvents": [
         {"team": {"id": "1"}, "clock": {"value": 100, "displayValue": "2"}, "type": {"type": "yellow-card"}, "participants": [{"athlete": {"displayName": "X"}}]},
     ]}
-    assert build_subs_split(_timeline_event_with_two_teams(), summary) == ([], [])
+    assert build_substitutions(_timeline_event_with_two_teams(), summary) == []
 
 
 def test_build_timeline_tags_each_row_with_team_abbr():
