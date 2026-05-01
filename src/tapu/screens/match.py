@@ -10,6 +10,7 @@ from textual.widgets import Footer, Header, Static
 
 from tapu.api import ESPNClient
 from tapu.config import League
+from tapu.widgets.match_card import format_live_status
 from tapu.widgets.match_detail import MatchDetail
 
 
@@ -150,13 +151,10 @@ class MatchScreen(Screen):
 
     def _update_clock_label(self) -> None:
         try:
-            state = self.event["status"]["type"].get("state", "")
-            if state != "in":
+            label = format_live_status(self.event)
+            if not label:
                 return
-            display_clock = self.event["status"].get("displayClock", "")
-            self.query_one("#status-clock", Static).update(
-                f"[green]● LIVE {display_clock}'[/green]"
-            )
+            self.query_one("#status-clock", Static).update(label)
         except Exception:
             pass
 

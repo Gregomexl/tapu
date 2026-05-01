@@ -1,5 +1,7 @@
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+
 from tapu.api.client import ESPNClient
 
 
@@ -85,7 +87,9 @@ async def test_clear_cache(client, sample_scoreboard):
 
 @pytest.mark.asyncio
 async def test_clear_cache_preserves_disk_files(tmp_path, monkeypatch):
-    import json, time
+    import json
+    import time
+
     from tapu.api import client as client_module
     monkeypatch.setattr(client_module, "DISK_CACHE_DIR", tmp_path)
 
@@ -104,6 +108,37 @@ async def test_aclose(client):
     with patch.object(client._http, "aclose", new_callable=AsyncMock) as mock_close:
         await client.aclose()
         mock_close.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_daterange_skips_disk_cache_when_range_includes_today(client, sample_scoreboard):
+    from datetime import datetime
+    today = datetime.now().strftime("%Y%m%d")
+    start = (datetime.now().replace(day=1)).strftime("%Y%m%d")
+    with patch.object(client._http, "get", new_callable=AsyncMock) as mock_get, \
+         patch.object(client, "_read_disk", return_value=None) as mock_read, \
+         patch.object(client, "_write_disk") as mock_write:
+        mock_get.return_value = _mock_response(sample_scoreboard)
+
+        await client.get_scoreboard_daterange("eng.1", start, today)
+
+        # When today is in the range, disk cache is bypassed entirely so a finished
+        # match isn't stuck on "LIVE" for up to an hour after the event ends.
+        mock_read.assert_not_called()
+        mock_write.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_daterange_uses_disk_cache_for_past_only_ranges(client, sample_scoreboard):
+    with patch.object(client._http, "get", new_callable=AsyncMock) as mock_get, \
+         patch.object(client, "_read_disk", return_value=None) as mock_read, \
+         patch.object(client, "_write_disk") as mock_write:
+        mock_get.return_value = _mock_response(sample_scoreboard)
+
+        await client.get_scoreboard_daterange("eng.1", "20200101", "20200131")
+
+        mock_read.assert_called_once()
+        mock_write.assert_called_once()
 
 
 @pytest.mark.asyncio

@@ -26,24 +26,50 @@ def _format_local_time(date_str: str) -> str:
         return date_str
 
 
-def _status_label(event: dict, pulse_on: bool = True) -> str:
+def _period_label(event: dict) -> str:
+    """Coarse period label — '1st', '2nd', 'ET', or '' — derived from status.period
+    with a fallback to status.type.name. Avoids the ticking-clock complexity since
+    ESPN's displayClock can drift between fetches and is fragile around stoppage time.
+    """
+    status = event.get("status", {})
+    name = status.get("type", {}).get("name", "").upper()
+    period = status.get("period", 0)
+    if "FIRST_HALF" in name or period == 1:
+        return "1st"
+    if "SECOND_HALF" in name or period == 2:
+        return "2nd"
+    if "EXTRA" in name or "OVERTIME" in name or period >= 3:
+        return "ET"
+    return ""
+
+
+def format_live_status(event: dict, pulse_on: bool = True) -> str:
+    """Status badge for in/post states — shared across MatchCard, MatchDetail, MatchScreen.
+
+    Returns "" for pre-match; callers render their own pre-match label.
+    """
     status = event["status"]["type"]
     state = status.get("state", "pre")
     if state == "in":
-        name = status.get("name", "")
-        if "HALFTIME" in name.upper() or "HALF_TIME" in name.upper():
-            return "[yellow]● HT[/yellow]"
-        period = event["status"].get("period", 1)
-        clock = ""
-        if period >= 2:
-            clock = event["status"].get("displayClock", "")
-        suffix = f" {clock}" if clock else ""
+        name = status.get("name", "").upper()
+        is_ht = "HALFTIME" in name or "HALF_TIME" in name
         dot = "[green]●[/green]" if pulse_on else " "
+        if is_ht:
+            return f"{dot} [bold yellow]HT[/bold yellow]"
+        period = _period_label(event)
+        suffix = f" {period}" if period else ""
         return f"{dot} [bold red]LIVE{suffix}[/bold red]"
     if state == "post":
         return f"[dim]{status.get('detail', 'FT')}[/dim]"
+    return ""
+
+
+def _status_label(event: dict, pulse_on: bool = True) -> str:
+    state = event["status"]["type"].get("state", "pre")
+    if state in ("in", "post"):
+        return format_live_status(event, pulse_on)
     date_str = event.get("date", "")
-    local_time = _format_local_time(date_str) if date_str else status.get("detail", "")
+    local_time = _format_local_time(date_str) if date_str else event["status"]["type"].get("detail", "")
     return f"[cyan]{local_time}[/cyan]"
 
 

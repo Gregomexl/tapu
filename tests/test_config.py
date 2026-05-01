@@ -1,5 +1,3 @@
-import pytest
-from pathlib import Path
 from tapu.config import League, RelatedTournament, load_leagues
 
 

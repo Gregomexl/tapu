@@ -6,6 +6,8 @@ from textual.containers import Horizontal  # used for goals/cards rows
 from textual.widget import Widget
 from textual.widgets import Static
 
+from tapu.widgets.match_card import format_live_status
+
 
 def _get_team(competitors: list[dict], home_away: str) -> dict:
     for c in competitors:
@@ -184,15 +186,7 @@ class MatchDetail(Widget):
         # Status / clock
         status = self.event["status"]["type"]
         state = status.get("state", "pre")
-        if state == "in":
-            display_clock = self.event["status"].get("displayClock", "")
-            period = self.event["status"].get("period", 0)
-            period_label = "HT" if display_clock == "45:00" and period == 1 else f"{display_clock}'"
-            status_text = f"[green bold]● LIVE {period_label}[/green bold]"
-        elif state == "post":
-            status_text = f"[dim]{status.get('detail', 'FT')}[/dim]"
-        else:
-            status_text = f"[dim]{status.get('detail', 'Upcoming')}[/dim]"
+        status_text = format_live_status(self.event) or f"[dim]{status.get('detail', 'Upcoming')}[/dim]"
         yield Static(status_text, id="status-clock", classes="status-line")
 
         # Venue

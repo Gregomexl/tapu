@@ -1,5 +1,4 @@
-import pytest
-from tapu.widgets.bracket import _round_key, _event_round, _winner_id, _bracket_lines
+from tapu.widgets.bracket import _bracket_lines, _event_round, _round_key, _winner_id
 
 
 def _make_event(round_headline: str, home_id: str, away_id: str,

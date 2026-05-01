@@ -1,23 +1,24 @@
 import pytest
 from textual.app import App, ComposeResult
+
 from tapu.config import League
 from tapu.widgets.bracket import BracketWidget
 from tapu.widgets.league_card import LeagueCard
-from tapu.widgets.match_card import MatchCard, _status_label
+from tapu.widgets.match_card import MatchCard, _period_label, _status_label, format_live_status
 from tapu.widgets.standings import StandingsTable
 
 
 def test_status_label_live():
     event = {
         "status": {
-            "type": {"name": "STATUS_IN_PROGRESS", "state": "in"},
+            "type": {"name": "STATUS_SECOND_HALF", "state": "in"},
             "displayClock": "67:00",
             "period": 2,
         }
     }
     label = _status_label(event)
     assert "LIVE" in label
-    assert "67:00" in label
+    assert "2nd" in label
     assert "red" in label or "bold" in label
 
 
@@ -45,6 +46,33 @@ def test_status_label_ft():
     label = _status_label(event)
     assert "FT" in label
     assert "dim" in label
+
+
+def test_period_label_first_half_from_period():
+    assert _period_label({"status": {"type": {"name": ""}, "period": 1}}) == "1st"
+
+
+def test_period_label_second_half_from_name():
+    assert _period_label({"status": {"type": {"name": "STATUS_SECOND_HALF"}, "period": 0}}) == "2nd"
+
+
+def test_period_label_extra_time():
+    assert _period_label({"status": {"type": {"name": ""}, "period": 3}}) == "ET"
+    assert _period_label({"status": {"type": {"name": "STATUS_OVERTIME"}, "period": 0}}) == "ET"
+
+
+def test_format_live_status_shows_half_label():
+    event = {
+        "status": {
+            "type": {"name": "STATUS_FIRST_HALF", "state": "in"},
+            "period": 1,
+        }
+    }
+    label = format_live_status(event)
+    assert "LIVE" in label
+    assert "1st" in label
+    # No minute granularity — half-only display by design.
+    assert "'" not in label
 
 
 def test_status_label_upcoming():

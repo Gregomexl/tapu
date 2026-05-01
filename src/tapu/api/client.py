@@ -90,10 +90,18 @@ class ESPNClient:
         )
 
     async def get_scoreboard_daterange(self, slug: str, start: str, end: str) -> dict[str, Any]:
+        # Ranges that include today/future hold volatile data — a long disk cache would
+        # leave finished matches stuck on "LIVE" for up to an hour. Short-circuit caching
+        # in that case; purely-past ranges keep the long cache since past matches don't change.
+        today = datetime.now().strftime("%Y%m%d")
+        if end >= today:
+            cache_ttl, disk_ttl = 3.0, None
+        else:
+            cache_ttl, disk_ttl = 300.0, 3600.0
         return await self._get(
             f"{BASE_URL}/{slug}/scoreboard?dates={start}-{end}",
-            cache_ttl=300.0,
-            disk_ttl=3600.0,
+            cache_ttl=cache_ttl,
+            disk_ttl=disk_ttl,
         )
 
     async def get_knockout_events(self, slug: str) -> dict[str, Any]:
