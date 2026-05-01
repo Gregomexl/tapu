@@ -13,6 +13,16 @@ def _stat(stats: list[dict], name: str) -> str:
     return "-"
 
 
+def _form_dots(form_str: str) -> str:
+    colors = {"W": "green", "D": "yellow", "L": "red"}
+    parts = []
+    for ch in form_str.upper():
+        color = colors.get(ch)
+        if color:
+            parts.append(f"[{color}]●[/{color}]")
+    return " ".join(parts)
+
+
 def _row_style(
     rank: int,
     total: int,
@@ -47,7 +57,15 @@ def _fill_table(
     relegation_spots: int = 0,
     promotion_spots: int = 0,
 ) -> None:
-    table.add_columns("#", "Team", "P", "W", "D", "L", "GD", "Pts")
+    has_form = any(
+        _stat(e.get("stats", []), "form") not in ("", "-")
+        for e in entries
+    )
+
+    if has_form:
+        table.add_columns("#", "Team", "P", "W", "D", "L", "GD", "Pts", "Form")
+    else:
+        table.add_columns("#", "Team", "P", "W", "D", "L", "GD", "Pts")
 
     def _rank(e: dict) -> int:
         for s in e.get("stats", []):
@@ -70,7 +88,7 @@ def _fill_table(
                 t.stylize(st)
             return t
 
-        table.add_row(
+        row = [
             cell(str(rank)),
             cell(team),
             cell(_stat(entry.get("stats", []), "gamesPlayed")),
@@ -79,7 +97,12 @@ def _fill_table(
             cell(_stat(entry.get("stats", []), "losses")),
             cell(_stat(entry.get("stats", []), "pointDifferential")),
             cell(_stat(entry.get("stats", []), "points")),
-        )
+        ]
+        if has_form:
+            form_str = _stat(entry.get("stats", []), "form")
+            form_val = Text.from_markup(_form_dots(form_str)) if form_str not in ("", "-") else Text("")
+            row.append(form_val)
+        table.add_row(*row)
 
 
 class StandingsTable(Widget):

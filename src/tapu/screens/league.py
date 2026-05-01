@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 from collections import defaultdict
 from datetime import date, datetime, timedelta
 from typing import ClassVar
@@ -6,10 +7,10 @@ from typing import ClassVar
 from textual import work
 from textual.app import ComposeResult
 from textual.binding import Binding, BindingType
-from textual.containers import Horizontal, VerticalScroll
+from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import Screen
 from textual.timer import Timer
-from textual.widgets import Footer, Header, Static, TabbedContent, TabPane
+from textual.widgets import Button, Footer, Header, Input, Static, TabbedContent, TabPane
 
 from tapu.api import ESPNClient
 from tapu.config import League, RelatedTournament
@@ -55,6 +56,26 @@ def _group_events_by_round(events: list) -> list[tuple[str, list]]:
     return sorted(by_round.items(), key=lambda x: _round_key(x[0]))
 
 
+def _apply_filters(
+    events: list[dict], status: str, query: str
+) -> list[dict]:
+    if status != "all":
+        state_map = {"live": "in", "done": "post", "upcoming": "pre"}
+        target = state_map.get(status, "")
+        events = [e for e in events if e["status"]["type"].get("state") == target]
+    if query:
+        q = query.lower()
+        events = [
+            e for e in events
+            if any(
+                q in c["team"].get("displayName", "").lower() or
+                q in c["team"].get("shortDisplayName", "").lower()
+                for c in e["competitions"][0]["competitors"]
+            )
+        ]
+    return events
+
+
 def _get_event_scores(event: dict) -> tuple[str, str]:
     competitors = event.get("competitions", [{}])[0].get("competitors", [])
     home = next((c for c in competitors if c.get("homeAway") == "home"), {})
@@ -80,6 +101,8 @@ class LeagueScreen(Screen):
         Binding("right", "next_tab", "→ Tab"),
         Binding("up", "app.focus_previous", "Prev", show=False),
         Binding("down", "app.focus_next", "Next", show=False),
+        Binding("f", "cycle_filter", "Filter", show=False),
+        Binding("/", "focus_search", "Search", show=False),
     ]
 
     DEFAULT_CSS = """
@@ -108,6 +131,32 @@ class LeagueScreen(Screen):
         text-style: bold;
         border-left: thick $accent;
     }
+    LeagueScreen .filter-bar {
+        height: 3;
+        padding: 0 1;
+        border-bottom: solid $surface-lighten-2;
+        align: left middle;
+    }
+    LeagueScreen .filter-chip {
+        padding: 0 2;
+        margin-right: 1;
+        border: none;
+        background: $surface-lighten-1;
+        color: $text-muted;
+        height: 1;
+        min-width: 8;
+    }
+    LeagueScreen .filter-chip.active {
+        background: $primary;
+        color: $text;
+    }
+    LeagueScreen #filter-input {
+        width: 1fr;
+        border: none;
+        background: $surface-lighten-1;
+        margin-left: 1;
+        height: 1;
+    }
     """
 
     def __init__(self, client: ESPNClient, league: League, scoreboard: dict) -> None:
@@ -119,6 +168,9 @@ class LeagueScreen(Screen):
         self._positions: dict[str, int] = {}
         self._loaded_tabs: set[str] = set()
         self._prev_scores: dict[str, tuple[str, str]] = {}
+        self._status_filter: str = "all"
+        self._team_query: str = ""
+        self._current_sb: dict = {}
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -133,11 +185,17 @@ class LeagueScreen(Screen):
                     )
                 else:
                     with Horizontal(classes="main-row"):
-                        yield VerticalScroll(
-                            Static("[dim]Loading...[/dim]", classes="no-matches"),
-                            id="matches-pane",
-                            classes="matches-col",
-                        )
+                        with Vertical(classes="matches-col"):
+                            with Horizontal(id="filter-bar", classes="filter-bar"):
+                                yield Button("All", id="chip-all", classes="filter-chip active")
+                                yield Button("Live", id="chip-live", classes="filter-chip")
+                                yield Button("Done", id="chip-done", classes="filter-chip")
+                                yield Button("Upcoming", id="chip-upcoming", classes="filter-chip")
+                                yield Input(placeholder="team…", id="filter-input")
+                            yield VerticalScroll(
+                                Static("[dim]Loading...[/dim]", classes="no-matches"),
+                                id="matches-pane",
+                            )
                         yield VerticalScroll(id="standings-pane", classes="standings-col")
             if self.league.is_tournament or self.league.has_bracket:
                 with TabPane("Bracket", id="tab-bracket"):
@@ -184,18 +242,20 @@ class LeagueScreen(Screen):
         return positions
 
     async def _render_matches(self, sb: dict) -> None:
+        self._current_sb = sb
         today = date.today()
         pane = self.query_one("#matches-pane", VerticalScroll)
-        events = sb.get("events", [])
 
         flash_ids: set[str] = set()
-        for event in events:
+        for event in sb.get("events", []):
             eid = event["id"]
             new_scores = _get_event_scores(event)
             old_scores = self._prev_scores.get(eid)
             if old_scores is not None and old_scores != new_scores:
                 flash_ids.add(eid)
             self._prev_scores[eid] = new_scores
+
+        events = _apply_filters(sb.get("events", []), self._status_filter, self._team_query)
 
         if not events:
             with self.app.batch_update():
@@ -207,7 +267,6 @@ class LeagueScreen(Screen):
             widgets.append(Static(_day_label(day, today), classes="section-header"))
             for ev in day_evs:
                 widgets.append(MatchCard(ev, positions=self._positions, flash=ev["id"] in flash_ids))
-        # Suspend repaints across the swap so the pane never renders empty mid-refresh.
         with self.app.batch_update():
             await pane.remove_children()
             await pane.mount(*widgets)
@@ -289,7 +348,7 @@ class LeagueScreen(Screen):
             else:
                 data = await self.client.get_tournament_events(self.league.slug)
             events = data.get("events", [])
-            # Bracket tab: known knockout rounds only (keys 0–9); exclude group stage (100+) and unrecognised (99)
+            # Bracket tab: known knockout rounds only (keys 0-9); exclude group stage (100+) and unrecognised (99)
             knockout = [ev for ev in events if _round_key(_event_round(ev)) <= 9]
             await pane.remove_children()
             await pane.mount(BracketWidget(knockout))
@@ -326,6 +385,67 @@ class LeagueScreen(Screen):
         except Exception:
             await matches_pane.remove_children()
             await matches_pane.mount(Static("[red]Failed to load[/red]", classes="no-matches"))
+
+    def _update_chips(self) -> None:
+        for chip_id, status in [
+            ("chip-all", "all"),
+            ("chip-live", "live"),
+            ("chip-done", "done"),
+            ("chip-upcoming", "upcoming"),
+        ]:
+            with contextlib.suppress(Exception):
+                chip = self.query_one(f"#{chip_id}", Button)
+                if self._status_filter == status:
+                    chip.add_class("active")
+                else:
+                    chip.remove_class("active")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        chip_map = {
+            "chip-all": "all",
+            "chip-live": "live",
+            "chip-done": "done",
+            "chip-upcoming": "upcoming",
+        }
+        if event.button.id in chip_map:
+            self._status_filter = chip_map[event.button.id]
+            self._update_chips()
+            if self._current_sb:
+                self.run_worker(self._render_matches(self._current_sb))
+
+    def on_input_changed(self, event: Input.Changed) -> None:
+        if event.input.id == "filter-input":
+            self._team_query = event.value
+            if self._current_sb:
+                self.run_worker(self._render_matches(self._current_sb))
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        if event.input.id == "filter-input":
+            self.query_one("#matches-pane", VerticalScroll).focus()
+
+    def on_key(self, event) -> None:
+        if event.key == "escape":
+            with contextlib.suppress(Exception):
+                inp = self.query_one("#filter-input", Input)
+                if inp.has_focus:
+                    self._team_query = ""
+                    inp.value = ""
+                    self.query_one("#matches-pane", VerticalScroll).focus()
+                    if self._current_sb:
+                        self.run_worker(self._render_matches(self._current_sb))
+                    event.stop()
+
+    def action_cycle_filter(self) -> None:
+        order = ["all", "live", "done", "upcoming"]
+        idx = order.index(self._status_filter)
+        self._status_filter = order[(idx + 1) % len(order)]
+        self._update_chips()
+        if self._current_sb:
+            self.run_worker(self._render_matches(self._current_sb))
+
+    def action_focus_search(self) -> None:
+        with contextlib.suppress(Exception):
+            self.query_one("#filter-input", Input).focus()
 
     def action_refresh(self) -> None:
         self.client.clear_cache(disk=True)

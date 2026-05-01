@@ -1,4 +1,4 @@
-from tapu.screens.league import LeagueScreen, _get_event_scores
+from tapu.screens.league import LeagueScreen, _apply_filters, _get_event_scores
 
 
 def _make_screen():
@@ -87,3 +87,84 @@ def test_get_event_scores_missing_score():
         }]
     }
     assert _get_event_scores(event) == ("", "")
+
+
+def _make_event(state: str, home: str, away: str) -> dict:
+    return {
+        "id": f"{home}-{away}",
+        "status": {"type": {"state": state}},
+        "competitions": [{
+            "competitors": [
+                {"team": {"displayName": home, "shortDisplayName": home[:3]}},
+                {"team": {"displayName": away, "shortDisplayName": away[:3]}},
+            ]
+        }]
+    }
+
+
+def test_apply_filters_all_status_returns_all():
+    events = [
+        _make_event("in", "Real Madrid", "Barcelona"),
+        _make_event("post", "Atletico", "Sevilla"),
+        _make_event("pre", "Villarreal", "Betis"),
+    ]
+    assert len(_apply_filters(events, "all", "")) == 3
+
+
+def test_apply_filters_live_only():
+    events = [
+        _make_event("in", "Real Madrid", "Barcelona"),
+        _make_event("post", "Atletico", "Sevilla"),
+    ]
+    result = _apply_filters(events, "live", "")
+    assert len(result) == 1
+    assert result[0]["id"] == "Real Madrid-Barcelona"
+
+
+def test_apply_filters_done_only():
+    events = [
+        _make_event("in", "Real Madrid", "Barcelona"),
+        _make_event("post", "Atletico", "Sevilla"),
+    ]
+    result = _apply_filters(events, "done", "")
+    assert len(result) == 1
+    assert result[0]["id"] == "Atletico-Sevilla"
+
+
+def test_apply_filters_upcoming_only():
+    events = [
+        _make_event("post", "Atletico", "Sevilla"),
+        _make_event("pre", "Villarreal", "Betis"),
+    ]
+    result = _apply_filters(events, "upcoming", "")
+    assert len(result) == 1
+    assert result[0]["id"] == "Villarreal-Betis"
+
+
+def test_apply_filters_team_query_case_insensitive():
+    events = [
+        _make_event("post", "Real Madrid", "Barcelona"),
+        _make_event("post", "Atletico", "Sevilla"),
+    ]
+    result = _apply_filters(events, "all", "madrid")
+    assert len(result) == 1
+    assert result[0]["id"] == "Real Madrid-Barcelona"
+
+
+def test_apply_filters_combined_status_and_query():
+    events = [
+        _make_event("in", "Real Madrid", "Barcelona"),
+        _make_event("post", "Real Madrid", "Atletico"),
+    ]
+    result = _apply_filters(events, "live", "madrid")
+    assert len(result) == 1
+    assert result[0]["status"]["type"]["state"] == "in"
+
+
+def test_apply_filters_no_results():
+    events = [_make_event("post", "Atletico", "Sevilla")]
+    assert _apply_filters(events, "live", "") == []
+
+
+def test_apply_filters_empty_events():
+    assert _apply_filters([], "all", "madrid") == []
