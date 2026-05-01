@@ -144,7 +144,7 @@ class LeagueScreen(Screen):
         border: none;
         background: $surface-lighten-1;
         color: $text-muted;
-        height: 1;
+        height: 3;
         min-width: 8;
     }
     LeagueScreen .filter-chip.active {
@@ -156,7 +156,7 @@ class LeagueScreen(Screen):
         border: none;
         background: $surface-lighten-1;
         margin-left: 1;
-        height: 1;
+        height: 3;
     }
     """
 
