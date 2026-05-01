@@ -5,7 +5,7 @@ from tapu.config import League
 from tapu.widgets.bracket import BracketWidget
 from tapu.widgets.league_card import LeagueCard
 from tapu.widgets.match_card import MatchCard, _period_label, _status_label, format_live_status
-from tapu.widgets.match_detail import _extract_meta, build_timeline
+from tapu.widgets.match_detail import _extract_meta, build_lineups, build_timeline
 from tapu.widgets.standings import StandingsTable
 
 
@@ -166,6 +166,67 @@ def test_build_timeline_drops_unknown_event_types():
 def test_build_timeline_empty_summary():
     assert build_timeline(_timeline_event_with_two_teams(), {}) == []
     assert build_timeline(_timeline_event_with_two_teams(), {"keyEvents": []}) == []
+
+
+def _lineup_summary():
+    def player(jersey, name, pos, starter):
+        return {
+            "athlete": {"jersey": jersey, "displayName": name},
+            "position": {"abbreviation": pos},
+            "starter": starter,
+        }
+    return {
+        "rosters": [
+            {
+                "team": {"id": "1", "displayName": "Real Madrid"},
+                "formation": "4-3-3",
+                "roster": [
+                    player("1", "Courtois", "GK", True),
+                    player("2", "Carvajal", "RB", True),
+                    player("4", "Alaba", "CB", True),
+                    player("13", "Lunin", "GK", False),
+                    player("18", "Vázquez", "RB", False),
+                ],
+            },
+            {
+                "team": {"id": "2", "displayName": "Barcelona"},
+                "formation": {"name": "4-3-2-1"},  # dict variant
+                "roster": [
+                    player("1", "ter Stegen", "GK", True),
+                ],
+            },
+        ]
+    }
+
+
+def test_build_lineups_orders_home_first():
+    event = _timeline_event_with_two_teams()
+    home_lines, away_lines = build_lineups(event, _lineup_summary())
+    assert "Real Madrid" in home_lines[0]
+    assert "Barcelona" in away_lines[0]
+
+
+def test_build_lineups_renders_formation_in_header():
+    event = _timeline_event_with_two_teams()
+    home_lines, away_lines = build_lineups(event, _lineup_summary())
+    assert "4-3-3" in home_lines[0]
+    # Dict-form formation also normalized to '4-3-2-1'.
+    assert "4-3-2-1" in away_lines[0]
+
+
+def test_build_lineups_separates_starters_from_bench():
+    event = _timeline_event_with_two_teams()
+    home_lines, _ = build_lineups(event, _lineup_summary())
+    starter_rows = [line for line in home_lines if "Courtois" in line or "Carvajal" in line or "Alaba" in line]
+    assert len(starter_rows) == 3
+    bench_line = next(line for line in home_lines if "Bench" in line)
+    assert "Lunin" in bench_line
+    assert "Vázquez" in bench_line
+
+
+def test_build_lineups_empty_when_no_rosters():
+    assert build_lineups(_timeline_event_with_two_teams(), {}) == []
+    assert build_lineups(_timeline_event_with_two_teams(), {"rosters": []}) == []
 
 
 def test_format_live_status_ht_overrides_clock_mode():

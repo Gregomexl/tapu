@@ -90,6 +90,75 @@ def build_timeline(event: dict, summary: dict) -> list[str]:
     return [s for _, s in items]
 
 
+def _format_formation(formation: Any) -> str:
+    """ESPN sometimes returns formation as a string ('4-3-3') and sometimes as
+    {'name': '4-3-3'}. Normalize."""
+    if isinstance(formation, dict):
+        return formation.get("name", "") or ""
+    return formation or ""
+
+
+def _format_lineup_section(team_roster: dict) -> list[str]:
+    """One team's lineup block: team name + formation header, starting XI rows, and a
+    one-line bench summary. Returns markup-ready lines (no enclosing widget).
+    """
+    team_name = team_roster.get("team", {}).get("displayName", "") or ""
+    formation = _format_formation(team_roster.get("formation"))
+    roster = team_roster.get("roster") or []
+    starters = [p for p in roster if p.get("starter")]
+    bench = [p for p in roster if not p.get("starter")]
+
+    lines: list[str] = []
+    header = f"[bold]{team_name}[/bold]"
+    if formation:
+        header += f"  [dim]{formation}[/dim]"
+    lines.append(header)
+
+    for p in starters:
+        athlete = p.get("athlete", {}) or {}
+        jersey = athlete.get("jersey") or "—"
+        name = athlete.get("displayName") or athlete.get("shortName") or "?"
+        pos = (p.get("position", {}) or {}).get("abbreviation", "")
+        lines.append(f"  [bold]{str(jersey):>2}[/bold]  {name}  [dim]{pos}[/dim]")
+
+    if bench:
+        # Cap the bench at 7 names so a 23-man squad doesn't bloat the panel.
+        bench_names = []
+        for p in bench[:7]:
+            athlete = p.get("athlete", {}) or {}
+            jersey = athlete.get("jersey") or "?"
+            name = athlete.get("displayName") or "?"
+            bench_names.append(f"{jersey} {name}")
+        more = f" · +{len(bench) - 7}" if len(bench) > 7 else ""
+        lines.append(f"  [dim]Bench:[/dim] [dim]{' · '.join(bench_names)}{more}[/dim]")
+
+    return lines
+
+
+def build_lineups(event: dict, summary: dict) -> list[list[str]]:
+    """Return [home_lines, away_lines] from summary.rosters, ordered home-first.
+
+    Empty list when ESPN hasn't published lineups yet (typical for pre-match >1h out).
+    """
+    rosters = summary.get("rosters") or []
+    if not rosters:
+        return []
+
+    competitors = event.get("competitions", [{}])[0].get("competitors", [])
+    home_id = next(
+        (str(c.get("team", {}).get("id", "")) for c in competitors if c.get("homeAway") == "home"),
+        "",
+    )
+    by_id = {str(r.get("team", {}).get("id", "")): r for r in rosters}
+    home = by_id.get(home_id)
+    away = next((r for tid, r in by_id.items() if tid != home_id), None)
+
+    if home and away:
+        return [_format_lineup_section(home), _format_lineup_section(away)]
+    # Fallback: ESPN didn't tag teams clearly — render in the order received.
+    return [_format_lineup_section(r) for r in rosters[:2]]
+
+
 def _extract_meta(event: dict, summary: dict) -> list[str]:
     """Inline match meta — weather, referee, attendance — pulled from whichever ESPN endpoint
     has it. Summary takes priority since it carries officials and gameInfo for soccer.
@@ -220,6 +289,11 @@ class MatchDetail(Widget):
         padding: 0 1 1 1;
         text-align: left;
     }
+    MatchDetail .lineup {
+        padding: 0 1;
+        margin: 0 0 1 0;
+        text-align: left;
+    }
     MatchDetail .venue-line {
         text-align: center;
         color: $text-muted;
@@ -326,6 +400,14 @@ class MatchDetail(Widget):
                 yield Static("\n".join(timeline_lines), classes="timeline")
             else:
                 yield Static("[dim]  No events yet[/dim]", classes="timeline")
+
+        # Lineups — formation + starting XI per team, with bench summary.
+        # ESPN publishes rosters ~1h before kickoff; the section just hides until then.
+        lineups = build_lineups(self.event, self.summary)
+        if lineups:
+            yield Static("👥  Lineups", classes="section-label")
+            for lines in lineups:
+                yield Static("\n".join(lines), classes="lineup")
 
         # Stats with progress bars
         teams_data = self.summary.get("boxscore", {}).get("teams", [])
