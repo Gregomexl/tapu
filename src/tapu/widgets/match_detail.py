@@ -128,6 +128,23 @@ def _format_clock_minute(raw: str) -> str:
     return raw.replace("'", "").strip()
 
 
+def _extract_jersey(roster_entry: dict) -> str:
+    """ESPN puts the jersey number in different spots — try them all and fall back to '—'.
+
+    Observed paths: roster_entry.jersey, roster_entry.athlete.jersey,
+    roster_entry.athlete.uniformNumber. Some payloads return integers; coerce to str.
+    """
+    athlete = roster_entry.get("athlete", {}) or {}
+    for candidate in (
+        roster_entry.get("jersey"),
+        athlete.get("jersey"),
+        athlete.get("uniformNumber"),
+    ):
+        if candidate not in (None, ""):
+            return str(candidate)
+    return "—"
+
+
 def _format_formation(formation: Any) -> str:
     """ESPN sometimes returns formation as a string ('4-3-3') and sometimes as
     {'name': '4-3-3'}. Normalize."""
@@ -153,19 +170,19 @@ def _format_lineup_section(team_roster: dict) -> list[str]:
     lines.append(header)
 
     for p in starters:
+        jersey = _extract_jersey(p)
         athlete = p.get("athlete", {}) or {}
-        jersey = athlete.get("jersey") or "—"
-        name = athlete.get("displayName") or athlete.get("shortName") or "?"
+        name = athlete.get("displayName") or athlete.get("shortName") or p.get("displayName") or "?"
         pos = (p.get("position", {}) or {}).get("abbreviation", "")
-        lines.append(f"  [bold]{str(jersey):>2}[/bold]  {name}  [dim]{pos}[/dim]")
+        lines.append(f"  [bold]{jersey:>2}[/bold]  {name}  [dim]{pos}[/dim]")
 
     if bench:
         # Cap the bench at 7 names so a 23-man squad doesn't bloat the panel.
         bench_names = []
         for p in bench[:7]:
+            jersey = _extract_jersey(p)
             athlete = p.get("athlete", {}) or {}
-            jersey = athlete.get("jersey") or "?"
-            name = athlete.get("displayName") or "?"
+            name = athlete.get("displayName") or p.get("displayName") or "?"
             bench_names.append(f"{jersey} {name}")
         more = f" · +{len(bench) - 7}" if len(bench) > 7 else ""
         lines.append(f"  [dim]Bench:[/dim] [dim]{' · '.join(bench_names)}{more}[/dim]")

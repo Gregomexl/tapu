@@ -265,6 +265,34 @@ def test_build_lineups_empty_when_no_rosters():
     assert build_lineups(_timeline_event_with_two_teams(), {"rosters": []}) == []
 
 
+def test_build_lineups_extracts_jersey_from_entry_level():
+    # ESPN sometimes puts jersey on the roster entry instead of inside athlete.
+    summary = {"rosters": [
+        {
+            "team": {"id": "1", "displayName": "Real Madrid"},
+            "formation": "4-3-3",
+            "roster": [
+                {"jersey": "9", "athlete": {"displayName": "Joselu"}, "position": {"abbreviation": "ST"}, "starter": True},
+            ],
+        },
+        {
+            "team": {"id": "2", "displayName": "Barcelona"},
+            "formation": "4-3-3",
+            "roster": [
+                {"athlete": {"displayName": "Lewandowski", "uniformNumber": 9}, "position": {"abbreviation": "ST"}, "starter": True},
+            ],
+        },
+    ]}
+    home_lines, away_lines = build_lineups(_timeline_event_with_two_teams(), summary)
+    starter_home = next(line for line in home_lines if "Joselu" in line)
+    starter_away = next(line for line in away_lines if "Lewandowski" in line)
+    # No '—' placeholder when the data is just on a different field.
+    assert "—" not in starter_home
+    assert "—" not in starter_away
+    assert " 9" in starter_home  # entry-level jersey picked up
+    assert " 9" in starter_away  # athlete.uniformNumber (integer) coerced to string
+
+
 def test_format_live_status_normalizes_stoppage_clock():
     # ESPN returns "90'+5'" with embedded apostrophes — render it as "90+5'" not "90'+5''".
     event = {
