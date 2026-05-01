@@ -2,7 +2,6 @@ from datetime import datetime
 from typing import Any
 
 from textual.app import ComposeResult
-from textual.containers import Horizontal  # used for goals/cards rows
 from textual.widget import Widget
 from textual.widgets import Static
 
@@ -14,6 +13,81 @@ def _get_team(competitors: list[dict], home_away: str) -> dict:
         if c["homeAway"] == home_away:
             return c
     return competitors[0]
+
+
+def _team_colors(event: dict) -> dict[str, str | None]:
+    """team_id (str) → '#hex' or None — used to tag timeline rows with a team-color block."""
+    out: dict[str, str | None] = {}
+    for c in event.get("competitions", [{}])[0].get("competitors", []):
+        team_id = str(c.get("team", {}).get("id", ""))
+        color = c.get("team", {}).get("color", "")
+        if team_id:
+            out[team_id] = f"#{color}" if color and len(color) == 6 else None
+    return out
+
+
+def _color_badge(hex_color: str | None) -> str:
+    if not hex_color:
+        return "  "
+    return f"[on {hex_color}][{hex_color}]  [/{hex_color}][/on {hex_color}]"
+
+
+def _participant_name(k: dict, idx: int = 0) -> str:
+    parts = k.get("participants") or []
+    if 0 <= idx < len(parts):
+        return parts[idx].get("athlete", {}).get("displayName", "")
+    return ""
+
+
+def _sub_text(k: dict) -> str:
+    parts = k.get("participants") or []
+    names = [p.get("athlete", {}).get("displayName", "") for p in parts if p.get("athlete")]
+    if len(names) >= 2:
+        return f"{names[0]}  ↔  {names[1]}"
+    if names:
+        return names[0]
+    return k.get("shortText", "Substitution")
+
+
+def build_timeline(event: dict, summary: dict) -> list[str]:
+    """Goals + cards + subs from keyEvents in chronological order.
+
+    Each row is `<icon>  <minute>'  <team-color block>  <text>` so the eye scans the
+    color column to read team-by-team without needing a left/right split.
+    Returns markup-only strings — caller wraps them in a Static.
+    """
+    colors = _team_colors(event)
+    items: list[tuple[float, str]] = []
+    for k in summary.get("keyEvents", []) or []:
+        team_id = str(k.get("team", {}).get("id", ""))
+        clock = k.get("clock", {}) or {}
+        clock_val = (clock.get("displayValue", "") or "").rstrip("'")
+        try:
+            secs = float(clock.get("value") or 0)
+        except (TypeError, ValueError):
+            secs = 0.0
+        type_str = (k.get("type", {}) or {}).get("type", "")
+
+        if k.get("scoringPlay"):
+            icon = "⚽"
+            text = (k.get("shortText") or "Goal").replace(" Goal", "")
+        elif "yellow-card" in type_str:
+            icon = "🟨"
+            text = _participant_name(k) or k.get("shortText") or "Booking"
+        elif "red-card" in type_str:
+            icon = "🟥"
+            text = _participant_name(k) or k.get("shortText") or "Sent Off"
+        elif "substitution" in type_str or type_str == "sub":
+            icon = "🔄"
+            text = _sub_text(k)
+        else:
+            continue
+
+        badge = _color_badge(colors.get(team_id))
+        items.append((secs, f"{icon}  [dim]{clock_val:>4}'[/dim]  {badge}  {text}"))
+
+    items.sort(key=lambda x: x[0])
+    return [s for _, s in items]
 
 
 def _extract_meta(event: dict, summary: dict) -> list[str]:
@@ -127,19 +201,6 @@ class MatchDetail(Widget):
         padding: 1 0 0 0;
         margin: 1 0 0 0;
     }
-    MatchDetail .goals-home {
-        width: 1fr;
-        text-align: right;
-        padding: 0 1 0 0;
-    }
-    MatchDetail .goals-sep {
-        width: 1;
-        color: $surface-lighten-2;
-    }
-    MatchDetail .goals-away {
-        width: 1fr;
-        padding: 0 0 0 1;
-    }
     MatchDetail .stat-row {
         height: 1;
         text-align: center;
@@ -150,13 +211,13 @@ class MatchDetail(Widget):
         text-style: bold;
         margin: 0 0 0 0;
     }
-    MatchDetail Horizontal {
-        height: auto;
-        margin: 0 0 0 0;
-    }
     MatchDetail .commentary {
         color: $text-muted;
         padding: 0 0 1 0;
+        text-align: left;
+    }
+    MatchDetail .timeline {
+        padding: 0 1 1 1;
         text-align: left;
     }
     MatchDetail .venue-line {
@@ -255,68 +316,16 @@ class MatchDetail(Widget):
                 yield Static("── Live Updates", classes="section-label")
                 yield Static("\n".join(lines), id="commentary", classes="commentary")
 
-        # Goals
-        key_events = self.summary.get("keyEvents", [])
-        goals = [k for k in key_events if k.get("scoringPlay")]
-        yield Static("⚽  Goals", classes="section-label")
-
-        if not goals:
-            yield Static("[dim]  No goals yet[/dim]")
-        else:
-            home_lines: list[str] = []
-            away_lines: list[str] = []
-            for g in goals:
-                team_id = str(g.get("team", {}).get("id", ""))
-                clock_val = g.get("clock", {}).get("displayValue", "")
-                name = g.get("shortText", "Goal").replace(" Goal", "")
-                # Mirror layout: home right-aligned (name → clock), away left-aligned (clock → name)
-                if team_id == home_id:
-                    home_lines.append(f"{name}  [dim]{clock_val}'[/dim]")
-                else:
-                    away_lines.append(f"[dim]{clock_val}'[/dim]  {name}")
-
-            rows = max(len(home_lines), len(away_lines), 1)
-            home_lines += [""] * (rows - len(home_lines))
-            away_lines += [""] * (rows - len(away_lines))
-
-            yield Horizontal(
-                Static("\n".join(home_lines), classes="goals-home"),
-                Static("│\n" * rows, classes="goals-sep"),
-                Static("\n".join(away_lines), classes="goals-away"),
-            )
-
-        # Cards
-        cards = [k for k in key_events if "card" in k.get("type", {}).get("type", "")]
-        if cards:
-            home_cards: list[str] = []
-            away_cards: list[str] = []
-            for c in cards:
-                team_id = str(c.get("team", {}).get("id", ""))
-                clock_val = c.get("clock", {}).get("displayValue", "")
-                name = c.get("participants", [{}])[0].get("athlete", {}).get("displayName", "?")
-                card_type = c.get("type", {}).get("type", "")
-                if card_type == "yellow-card":
-                    icon = "[bold yellow]▪[/bold yellow]"
-                elif card_type == "red-card":
-                    icon = "[bold red]■[/bold red]"
-                else:
-                    icon = "[bold yellow]▪[/bold yellow][bold red]■[/bold red]"
-                # Mirror layout: home right-aligned (name → clock → icon), away left-aligned (icon → clock → name)
-                if team_id == home_id:
-                    home_cards.append(f"{name}  [dim]{clock_val}'[/dim]  {icon}")
-                else:
-                    away_cards.append(f"{icon}  [dim]{clock_val}'[/dim]  {name}")
-
-            if home_cards or away_cards:
-                yield Static("🟨  Cards", classes="section-label")
-                rows = max(len(home_cards), len(away_cards), 1)
-                home_cards += [""] * (rows - len(home_cards))
-                away_cards += [""] * (rows - len(away_cards))
-                yield Horizontal(
-                    Static("\n".join(home_cards), classes="goals-home"),
-                    Static("│\n" * rows, classes="goals-sep"),
-                    Static("\n".join(away_cards), classes="goals-away"),
-                )
+        # Timeline — goals · cards · subs in chronological order, tagged by team color.
+        # Replaces the previous home/away split for Goals and Cards: one feed reads as
+        # the actual narrative of the match, and substitutions slot in naturally.
+        if state in ("in", "post"):
+            timeline_lines = build_timeline(self.event, self.summary)
+            yield Static("📋  Timeline", classes="section-label")
+            if timeline_lines:
+                yield Static("\n".join(timeline_lines), classes="timeline")
+            else:
+                yield Static("[dim]  No events yet[/dim]", classes="timeline")
 
         # Stats with progress bars
         teams_data = self.summary.get("boxscore", {}).get("teams", [])

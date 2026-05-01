@@ -5,7 +5,7 @@ from tapu.config import League
 from tapu.widgets.bracket import BracketWidget
 from tapu.widgets.league_card import LeagueCard
 from tapu.widgets.match_card import MatchCard, _period_label, _status_label, format_live_status
-from tapu.widgets.match_detail import _extract_meta
+from tapu.widgets.match_detail import _extract_meta, build_timeline
 from tapu.widgets.standings import StandingsTable
 
 
@@ -118,6 +118,54 @@ def test_extract_meta_attendance_formatted():
 
 def test_extract_meta_empty_when_no_data():
     assert _extract_meta({"competitions": [{}]}, {}) == []
+
+
+def _timeline_event_with_two_teams():
+    return {
+        "competitions": [{
+            "competitors": [
+                {"team": {"id": "1", "color": "FF0000"}, "homeAway": "home"},
+                {"team": {"id": "2", "color": "0000FF"}, "homeAway": "away"},
+            ]
+        }]
+    }
+
+
+def test_build_timeline_orders_chronologically_across_event_types():
+    summary = {"keyEvents": [
+        {"team": {"id": "1"}, "clock": {"value": 4500, "displayValue": "75"}, "scoringPlay": True, "shortText": "Pedri Goal", "type": {"type": "play"}},
+        {"team": {"id": "2"}, "clock": {"value": 1800, "displayValue": "30"}, "type": {"type": "yellow-card"}, "participants": [{"athlete": {"displayName": "Vinícius"}}]},
+        {"team": {"id": "1"}, "clock": {"value": 3840, "displayValue": "64"}, "type": {"type": "substitution"}, "participants": [{"athlete": {"displayName": "García"}}, {"athlete": {"displayName": "López"}}]},
+    ]}
+    lines = build_timeline(_timeline_event_with_two_teams(), summary)
+    assert len(lines) == 3
+    # Ordered by clock seconds: yellow card (1800) → sub (3840) → goal (4500)
+    assert "Vinícius" in lines[0] and "🟨" in lines[0]
+    assert "García" in lines[1] and "🔄" in lines[1]
+    assert "Pedri" in lines[2] and "⚽" in lines[2]
+
+
+def test_build_timeline_tags_each_row_with_team_color():
+    summary = {"keyEvents": [
+        {"team": {"id": "1"}, "clock": {"value": 600, "displayValue": "10"}, "scoringPlay": True, "shortText": "Goal", "type": {}},
+    ]}
+    line = build_timeline(_timeline_event_with_two_teams(), summary)[0]
+    assert "#FF0000" in line  # home team color baked into the badge
+
+
+def test_build_timeline_drops_unknown_event_types():
+    summary = {"keyEvents": [
+        {"team": {"id": "1"}, "clock": {"value": 100, "displayValue": "2"}, "type": {"type": "corner-kick"}},
+        {"team": {"id": "1"}, "clock": {"value": 200, "displayValue": "4"}, "type": {"type": "yellow-card"}, "participants": [{"athlete": {"displayName": "X"}}]},
+    ]}
+    lines = build_timeline(_timeline_event_with_two_teams(), summary)
+    assert len(lines) == 1
+    assert "🟨" in lines[0]
+
+
+def test_build_timeline_empty_summary():
+    assert build_timeline(_timeline_event_with_two_teams(), {}) == []
+    assert build_timeline(_timeline_event_with_two_teams(), {"keyEvents": []}) == []
 
 
 def test_format_live_status_ht_overrides_clock_mode():
