@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import ClassVar
+
 from textual.app import ComposeResult
 from textual.binding import Binding, BindingType
 from textual.containers import Vertical
@@ -17,7 +19,7 @@ def _filter_leagues(leagues: list[League], query: str) -> list[League]:
 
 
 class LeaguePaletteScreen(ModalScreen):
-    BINDINGS: list[BindingType] = [
+    BINDINGS: ClassVar[list[BindingType]] = [
         Binding("escape", "dismiss", "Close", show=False),
     ]
 

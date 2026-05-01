@@ -1,3 +1,5 @@
+from typing import ClassVar
+
 from textual.app import App
 from textual.binding import Binding, BindingType
 
@@ -18,7 +20,7 @@ class TapuApp(App):
     TITLE = "Tapú"
     SUB_TITLE = "fútbol en tu terminal"
 
-    BINDINGS: list[BindingType] = [
+    BINDINGS: ClassVar[list[BindingType]] = [
         Binding("g", "open_palette", "Go to league"),
         Binding("?", "open_help", "Help"),
     ]

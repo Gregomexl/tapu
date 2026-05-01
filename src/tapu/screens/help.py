@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import ClassVar
+
 from textual.app import ComposeResult
 from textual.binding import Binding, BindingType
 from textual.containers import Vertical, VerticalScroll
@@ -8,7 +10,7 @@ from textual.widgets import Static
 
 
 class HelpScreen(ModalScreen):
-    BINDINGS: list[BindingType] = [
+    BINDINGS: ClassVar[list[BindingType]] = [
         Binding("escape", "dismiss", "Close", show=False),
         Binding("?", "dismiss", "Close", show=False),
     ]
