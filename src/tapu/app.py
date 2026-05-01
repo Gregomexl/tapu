@@ -57,10 +57,11 @@ class TapuApp(App):
         def _on_league_selected(league) -> None:
             if league is None:
                 return
+            from tapu.screens.dashboard import DashboardScreen
             from tapu.screens.league import LeagueScreen
-            from tapu.screens.match import MatchScreen
-            while len(self.screen_stack) > 1 and isinstance(
-                self.screen_stack[-1], (LeagueScreen, MatchScreen)
+            # Pop until DashboardScreen is on top so no stale screen remains
+            while len(self.screen_stack) > 1 and not isinstance(
+                self.screen_stack[-1], DashboardScreen
             ):
                 self.pop_screen()
             self.push_screen(LeagueScreen(self.client, league, {}))
@@ -70,7 +71,7 @@ class TapuApp(App):
     def action_open_help(self) -> None:
         from tapu.screens.help import HelpScreen
         bindings = [
-            b for b in self.screen.BINDINGS
+            b for b in (*self.BINDINGS, *self.screen.BINDINGS)
             if isinstance(b, Binding)
         ]
         self.push_screen(HelpScreen(bindings))
