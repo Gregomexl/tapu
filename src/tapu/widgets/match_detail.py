@@ -16,6 +16,45 @@ def _get_team(competitors: list[dict], home_away: str) -> dict:
     return competitors[0]
 
 
+def _extract_meta(event: dict, summary: dict) -> list[str]:
+    """Inline match meta — weather, referee, attendance — pulled from whichever ESPN endpoint
+    has it. Summary takes priority since it carries officials and gameInfo for soccer.
+    """
+    parts: list[str] = []
+    summary_comp = (summary or {}).get("header", {}).get("competitions", [{}])[0]
+    event_comp = event.get("competitions", [{}])[0]
+
+    weather = (summary or {}).get("gameInfo", {}).get("weather") or summary_comp.get("weather") or {}
+    if isinstance(weather, dict):
+        wx = weather.get("displayValue") or weather.get("description") or ""
+        temp = weather.get("temperature")
+        if wx and temp is not None:
+            parts.append(f"☁ {wx} {temp}°")
+        elif wx:
+            parts.append(f"☁ {wx}")
+
+    officials = summary_comp.get("officials") or event_comp.get("officials") or []
+    if officials:
+        head = next(
+            (o for o in officials if "head" in (o.get("position", {}).get("displayName", "") or "").lower()),
+            officials[0],
+        )
+        ref_name = head.get("displayName") or head.get("fullName")
+        if ref_name:
+            parts.append(f"Ref: {ref_name}")
+
+    attendance = summary_comp.get("attendance") or event_comp.get("attendance")
+    if attendance:
+        try:
+            n = int(attendance)
+            if n > 0:
+                parts.append(f"{n:,}")
+        except (ValueError, TypeError):
+            pass
+
+    return parts
+
+
 def _format_local_time(date_str: str) -> str:
     try:
         dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
@@ -196,6 +235,11 @@ class MatchDetail(Widget):
         if stadium or city:
             location = f"{stadium} · {city}" if stadium and city else stadium or city
             yield Static(f"[dim]{location}[/dim]", classes="venue-line")
+
+        # Match meta: weather · referee · attendance
+        meta_parts = _extract_meta(self.event, self.summary)
+        if meta_parts:
+            yield Static(f"[dim]{' · '.join(meta_parts)}[/dim]", classes="venue-line")
 
         # Live commentary
         if state == "in":
