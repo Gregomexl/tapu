@@ -19,7 +19,8 @@ def test_status_label_live():
     label = _status_label(event)
     assert "LIVE" in label
     assert "2nd" in label
-    assert "red" in label or "bold" in label
+    assert "green" in label
+    assert "red" not in label
 
 
 def test_status_label_ht():

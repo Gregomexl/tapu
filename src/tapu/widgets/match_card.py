@@ -65,7 +65,7 @@ def format_live_status(event: dict, pulse_on: bool = True, *, show_clock: bool =
         else:
             period = _period_label(event)
             suffix = f" {period}" if period else ""
-        return f"{dot} [bold red]LIVE{suffix}[/bold red]"
+        return f"{dot} [bold green]LIVE{suffix}[/bold green]"
     if state == "post":
         return f"[dim]{status.get('detail', 'FT')}[/dim]"
     return ""
