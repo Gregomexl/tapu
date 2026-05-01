@@ -43,9 +43,12 @@ def _period_label(event: dict) -> str:
     return ""
 
 
-def format_live_status(event: dict, pulse_on: bool = True) -> str:
+def format_live_status(event: dict, pulse_on: bool = True, *, show_clock: bool = False) -> str:
     """Status badge for in/post states — shared across MatchCard, MatchDetail, MatchScreen.
 
+    `show_clock=False` (default, used by MatchCard): coarse period label — `LIVE 1st` / `LIVE 2nd` / `LIVE ET`.
+    `show_clock=True` (MatchDetail/MatchScreen): the API minute, e.g. `LIVE 12:34'`.
+    `HT` rendered only while the match is actually in the halftime break, regardless of mode.
     Returns "" for pre-match; callers render their own pre-match label.
     """
     status = event["status"]["type"]
@@ -56,8 +59,12 @@ def format_live_status(event: dict, pulse_on: bool = True) -> str:
         dot = "[green]●[/green]" if pulse_on else " "
         if is_ht:
             return f"{dot} [bold yellow]HT[/bold yellow]"
-        period = _period_label(event)
-        suffix = f" {period}" if period else ""
+        if show_clock:
+            clock = event["status"].get("displayClock", "")
+            suffix = f" {clock}'" if clock else ""
+        else:
+            period = _period_label(event)
+            suffix = f" {period}" if period else ""
         return f"{dot} [bold red]LIVE{suffix}[/bold red]"
     if state == "post":
         return f"[dim]{status.get('detail', 'FT')}[/dim]"

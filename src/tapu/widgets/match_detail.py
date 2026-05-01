@@ -186,7 +186,7 @@ class MatchDetail(Widget):
         # Status / clock
         status = self.event["status"]["type"]
         state = status.get("state", "pre")
-        status_text = format_live_status(self.event) or f"[dim]{status.get('detail', 'Upcoming')}[/dim]"
+        status_text = format_live_status(self.event, show_clock=True) or f"[dim]{status.get('detail', 'Upcoming')}[/dim]"
         yield Static(status_text, id="status-clock", classes="status-line")
 
         # Venue

@@ -75,6 +75,35 @@ def test_format_live_status_shows_half_label():
     assert "'" not in label
 
 
+def test_format_live_status_shows_clock_when_requested():
+    # Match panel passes show_clock=True to surface the API minute instead of the period.
+    event = {
+        "status": {
+            "type": {"name": "STATUS_SECOND_HALF", "state": "in"},
+            "displayClock": "67:23",
+            "period": 2,
+        }
+    }
+    label = format_live_status(event, show_clock=True)
+    assert "LIVE" in label
+    assert "67:23" in label
+    assert "1st" not in label and "2nd" not in label
+
+
+def test_format_live_status_ht_overrides_clock_mode():
+    # HT trumps show_clock: during the halftime break the panel renders 'HT', not '45:00'.
+    event = {
+        "status": {
+            "type": {"name": "STATUS_HALFTIME", "state": "in"},
+            "displayClock": "45:00",
+            "period": 1,
+        }
+    }
+    label = format_live_status(event, show_clock=True)
+    assert "HT" in label
+    assert "45:00" not in label
+
+
 def test_status_label_upcoming():
     event = {
         "status": {

@@ -155,7 +155,7 @@ class MatchScreen(Screen):
 
     def _update_clock_label(self) -> None:
         try:
-            label = format_live_status(self.event)
+            label = format_live_status(self.event, show_clock=True)
             if not label:
                 return
             self.query_one("#status-clock", Static).update(label)
