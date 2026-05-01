@@ -76,7 +76,8 @@ class LeagueScreen(Screen):
         Binding("b", "app.pop_screen", "Back", show=False),
         Binding("r", "refresh", "Refresh"),
         Binding("m", "more", "More"),
-        Binding("?", "app.open_chat", "Chat"),
+        Binding("left", "prev_tab", "← Tab"),
+        Binding("right", "next_tab", "→ Tab"),
         Binding("up", "app.focus_previous", "Prev", show=False),
         Binding("down", "app.focus_next", "Next", show=False),
     ]
@@ -343,6 +344,22 @@ class LeagueScreen(Screen):
             return
         self._days_back += 7
         self.run_worker(self._load_main())
+
+    def action_next_tab(self) -> None:
+        tc = self.query_one(TabbedContent)
+        pane_ids = [p.id for p in tc.query(TabPane)]
+        if not pane_ids:
+            return
+        idx = pane_ids.index(tc.active) if tc.active in pane_ids else 0
+        tc.active = pane_ids[(idx + 1) % len(pane_ids)]
+
+    def action_prev_tab(self) -> None:
+        tc = self.query_one(TabbedContent)
+        pane_ids = [p.id for p in tc.query(TabPane)]
+        if not pane_ids:
+            return
+        idx = pane_ids.index(tc.active) if tc.active in pane_ids else 0
+        tc.active = pane_ids[(idx - 1) % len(pane_ids)]
 
     def on_match_card_selected(self, message: MatchCard.Selected) -> None:
         from tapu.screens.match import MatchScreen

@@ -19,7 +19,6 @@ class MatchScreen(Screen):
         Binding("escape", "app.pop_screen", "Back"),
         Binding("b", "app.pop_screen", "Back", show=False),
         Binding("r", "refresh", "Refresh"),
-        Binding("?", "app.open_chat", "Chat"),
     ]
 
     DEFAULT_CSS = """

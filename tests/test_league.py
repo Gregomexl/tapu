@@ -53,6 +53,13 @@ def test_get_event_scores_returns_home_away():
     assert _get_event_scores(event) == ("2", "1")
 
 
+def test_tab_cycling_arithmetic():
+    ids = ["tab-main", "tab-bracket", "tab-copa"]
+    assert ids[(ids.index("tab-main") + 1) % len(ids)] == "tab-bracket"
+    assert ids[(ids.index("tab-copa") + 1) % len(ids)] == "tab-main"
+    assert ids[(ids.index("tab-main") - 1) % len(ids)] == "tab-copa"
+
+
 def test_get_event_scores_missing_score():
     event = {
         "id": "456",

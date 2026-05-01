@@ -22,7 +22,6 @@ uv run ruff format src   # Format
 - `MatchScreen` — detailed match stats, goals, cards, progress bars
 - `MatchDayScreen` — all matches for a specific date
 - `WCGroupScreen` — World Cup group stage standings
-- `ChatScreen` — placeholder (v2 feature)
 
 **Config:** `leagues.toml` at repo root defines all leagues. `src/tapu/config.py` loads it into frozen `League` dataclasses. Adding a league is a one-line TOML entry — no code changes needed. Key `League` fields:
 - `slug` — ESPN API identifier (e.g. `eng.1`, `fifa.world`)
