@@ -169,7 +169,7 @@ class MatchdayScreen(Screen):
             card.display = self._active_group is None or group == self._active_group
 
     def action_refresh(self) -> None:
-        self.client.clear_cache()
+        self.client.clear_cache(disk=True)
         self.run_worker(self._load(), exclusive=True)
 
     def on_match_card_selected(self, message: MatchCard.Selected) -> None:

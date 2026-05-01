@@ -16,6 +16,22 @@ def _cache_key(url: str) -> str:
     return url.replace("://", "_").replace("/", "_").replace("?", "_").replace("&", "_").replace("=", "_").replace("-", "_")
 
 
+def _has_team_ids(data: Any) -> bool:
+    """Real ESPN standings always include team.id on every entry. If we get a payload
+    with entries but no team.ids, treat it as poisoned (fixture/test data) and force
+    a refetch — otherwise it would sit in the disk cache for an hour misleading the UI.
+    """
+    if not isinstance(data, dict):
+        return True
+    entries: list = []
+    for child in data.get("children", []):
+        entries.extend(child.get("standings", {}).get("entries", []))
+    entries.extend(data.get("standings", {}).get("entries", []))
+    if not entries:
+        return True  # not a standings-shaped payload — let the caller decide
+    return any(e.get("team", {}).get("id") for e in entries)
+
+
 class ESPNClient:
     def __init__(self, cache_ttl: float = 30.0) -> None:
         self._http = httpx.AsyncClient(
@@ -84,10 +100,17 @@ class ESPNClient:
         )
 
     async def get_standings(self, slug: str) -> dict[str, Any]:
-        return await self._get(
-            f"{STANDINGS_URL}/{slug}/standings",
-            disk_ttl=3600.0,  # 1 hour — standings rarely change mid-day
-        )
+        url = f"{STANDINGS_URL}/{slug}/standings"
+        data = await self._get(url, disk_ttl=3600.0)  # 1 hour — standings rarely change mid-day
+        if not _has_team_ids(data):
+            # Cache holds bad data (e.g. fixture leak). Evict in-memory + disk and refetch once.
+            self._cache.pop(url, None)
+            try:
+                self._disk_path(url).unlink(missing_ok=True)
+            except Exception:
+                pass
+            data = await self._get(url, disk_ttl=3600.0)
+        return data
 
     async def get_scoreboard_daterange(self, slug: str, start: str, end: str) -> dict[str, Any]:
         # Ranges that include today/future hold volatile data — a long disk cache would
@@ -127,8 +150,17 @@ class ESPNClient:
             cache_ttl=3.0,
         )
 
-    def clear_cache(self) -> None:
+    def clear_cache(self, disk: bool = False) -> None:
+        """Clear the in-memory cache. Pass `disk=True` to also wipe ~/.cache/tapu —
+        the in-app escape hatch when stale data has somehow ended up on disk.
+        """
         self._cache.clear()
+        if disk:
+            try:
+                for path in DISK_CACHE_DIR.glob("*.json"):
+                    path.unlink(missing_ok=True)
+            except Exception:
+                pass
 
     async def aclose(self) -> None:
         await self._http.aclose()

@@ -99,7 +99,7 @@ class WCGroupScreen(Screen):
             await matches_pane.mount(Static("[red]Failed to load[/red]", classes="no-matches"))
 
     def action_refresh(self) -> None:
-        self.client.clear_cache()
+        self.client.clear_cache(disk=True)
         self._load_group()
 
     def on_match_card_selected(self, message: MatchCard.Selected) -> None:

@@ -136,7 +136,7 @@ class DashboardScreen(Screen):
             self.sub_title = f"Updated {delta // 60}m ago"
 
     def action_refresh(self) -> None:
-        self.client.clear_cache()
+        self.client.clear_cache(disk=True)
         self._scoreboards.clear()
         self.run_worker(self._load_all(manual=True))
 

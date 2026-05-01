@@ -166,6 +166,6 @@ class MatchScreen(Screen):
             pass
 
     def action_refresh(self) -> None:
-        self.client.clear_cache()
+        self.client.clear_cache(disk=True)
         self._last_fingerprint = ""
         self.run_worker(self._load_fresh(), exclusive=False)

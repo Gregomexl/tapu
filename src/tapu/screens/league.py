@@ -328,7 +328,7 @@ class LeagueScreen(Screen):
             await matches_pane.mount(Static("[red]Failed to load[/red]", classes="no-matches"))
 
     def action_refresh(self) -> None:
-        self.client.clear_cache()
+        self.client.clear_cache(disk=True)
         active = self.query_one(TabbedContent).active
         if active == "tab-main" or not active:
             self.run_worker(self._load_main())

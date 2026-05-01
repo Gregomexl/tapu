@@ -104,6 +104,51 @@ async def test_clear_cache_preserves_disk_files(tmp_path, monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_clear_cache_disk_true_wipes_disk(tmp_path, monkeypatch):
+    import json
+    import time
+
+    from tapu.api import client as client_module
+    monkeypatch.setattr(client_module, "DISK_CACHE_DIR", tmp_path)
+
+    c = ESPNClient()
+    cache_file = tmp_path / "some_cached_endpoint.json"
+    cache_file.write_text(json.dumps({"ts": time.time(), "data": {"events": []}}))
+
+    c.clear_cache(disk=True)
+
+    assert not cache_file.exists()
+    await c.aclose()
+
+
+@pytest.mark.asyncio
+async def test_get_standings_evicts_payload_without_team_ids(tmp_path, monkeypatch):
+    """If the cache has fixture-shaped data (entries with no team.id), get_standings
+    must drop it and refetch — otherwise the UI sees a 2-team La Liga for an hour."""
+    import json
+    import time as time_mod
+
+    from tapu.api import client as client_module
+    monkeypatch.setattr(client_module, "DISK_CACHE_DIR", tmp_path)
+
+    c = ESPNClient()
+    poisoned = {"standings": {"entries": [{"team": {"displayName": "Real Madrid"}}]}}
+    real = {"standings": {"entries": [{"team": {"id": "86", "displayName": "Real Madrid"}}]}}
+
+    url = f"{client_module.STANDINGS_URL}/esp.1/standings"
+    cache_file = tmp_path / f"{client_module._cache_key(url)}.json"
+    cache_file.write_text(json.dumps({"ts": time_mod.time(), "data": poisoned}))
+
+    with patch.object(c._http, "get", new_callable=AsyncMock) as mock_get:
+        mock_get.return_value = _mock_response(real)
+        result = await c.get_standings("esp.1")
+
+    assert result == real
+    assert mock_get.called  # poisoned cache was bypassed and a real fetch happened
+    await c.aclose()
+
+
+@pytest.mark.asyncio
 async def test_aclose(client):
     with patch.object(client._http, "aclose", new_callable=AsyncMock) as mock_close:
         await client.aclose()
