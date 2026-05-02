@@ -39,7 +39,7 @@ class HelpScreen(ModalScreen):
         lines: list[str] = ["[bold]Key Bindings[/bold]\n"]
         if visible:
             for b in visible:
-                lines.append(f"  [bold $accent]{b.key:<12}[/bold $accent] {b.description}")
+                lines.append(f"  [bold cyan]{b.key:<12}[/bold cyan] {b.description}")
         if hidden:
             lines.append("\n[dim]Hidden shortcuts[/dim]")
             for b in hidden:

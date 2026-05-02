@@ -116,7 +116,7 @@ class MatchCard(Widget, can_focus=True):
         background: $surface-lighten-1;
     }
     MatchCard.--flashing {
-        border: round $success;
+        border: tall $success;
         background: $success 8%;
     }
     MatchCard.--flashing #line1 {
