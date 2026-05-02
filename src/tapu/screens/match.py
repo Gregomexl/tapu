@@ -25,6 +25,7 @@ class MatchScreen(Screen):
     MatchScreen > VerticalScroll {
         background: $surface;
         align: center top;
+        scrollbar-size: 0;
     }
     MatchScreen .loading {
         width: 80;
