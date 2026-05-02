@@ -135,7 +135,7 @@ class MatchScreen(Screen):
                 )
             if not self._positions:
                 self._positions = await self._fetch_positions()
-            new_widget = MatchDetail(self.event, summary, client=self.client, positions=self._positions)
+            new_widget = MatchDetail(self.event, summary, client=self.client, positions=self._positions, league_name=self.league.full_name)
             with self.app.batch_update():
                 await scroll.remove_children()
                 await scroll.mount(new_widget)

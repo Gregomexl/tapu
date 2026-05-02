@@ -287,6 +287,8 @@ class MatchDetail(Widget):
     }
     MatchDetail .header-score {
         text-align: center;
+        padding: 1 0;
+        height: 3;
     }
     MatchDetail .header-status {
         text-align: center;
@@ -383,12 +385,14 @@ class MatchDetail(Widget):
         summary: dict[str, Any],
         client=None,
         positions: dict[str, int] | None = None,
+        league_name: str = "",
     ) -> None:
         super().__init__()
         self.event = event
         self.summary = summary
         self._client = client
         self._positions = positions or {}
+        self._league_name = league_name
         self._is_live = event["status"]["type"].get("state") == "in"
 
     def compose(self) -> ComposeResult:
@@ -416,29 +420,57 @@ class MatchDetail(Widget):
         competitors = competition["competitors"]
         home = _get_team(competitors, "home")
         away = _get_team(competitors, "away")
+        state = self.event["status"]["type"].get("state")
+        status = self.event["status"]["type"]
+
+        try:
+            home_score_int = int(home.get("score", -1))
+            away_score_int = int(away.get("score", -1))
+        except (ValueError, TypeError):
+            home_score_int = away_score_int = -1
+
         home_score = home.get("score", "-")
         away_score = away.get("score", "-")
         home_name = home["team"]["displayName"]
         away_name = away["team"]["displayName"]
-        status = self.event["status"]["type"]
 
-        def _team_color(team: dict) -> str:
+        def _hex_color(team: dict) -> str:
             color = team.get("color", "")
-            if color and len(color) == 6:
-                return f"#{color}"
-            return "white"
+            return color if len(color) == 6 else ""
 
-        home_color = _team_color(home["team"])
-        away_color = _team_color(away["team"])
+        home_hex = _hex_color(home["team"])
+        away_hex = _hex_color(away["team"])
+
+        # Avoid showing the same color for both teams
+        if home_hex and away_hex and home_hex.lower() == away_hex.lower():
+            away_hex = ""
+
+        home_color = f"#{home_hex}" if home_hex else "white"
+        away_color = f"#{away_hex}" if away_hex else "cyan"
 
         home_colored = f"[{home_color}][bold]{home_name.upper()}[/bold][/{home_color}]"
         away_colored = f"[{away_color}][bold]{away_name.upper()}[/bold][/{away_color}]"
+
+        # Score: highlight winner/leader; dim loser; both yellow when level
+        if state in ("in", "post") and home_score_int >= 0 and away_score_int >= 0:
+            if home_score_int > away_score_int:
+                h_score = f"[bold bright_white]{home_score}[/bold bright_white]"
+                a_score = f"[dim]{away_score}[/dim]"
+            elif away_score_int > home_score_int:
+                h_score = f"[dim]{home_score}[/dim]"
+                a_score = f"[bold bright_white]{away_score}[/bold bright_white]"
+            else:
+                h_score = f"[bold yellow]{home_score}[/bold yellow]"
+                a_score = f"[bold yellow]{away_score}[/bold yellow]"
+        else:
+            h_score = f"[dim]{home_score}[/dim]"
+            a_score = f"[dim]{away_score}[/dim]"
 
         status_text = (
             format_live_status(self.event, show_clock=True) or f"[dim]{status.get('detail', 'Upcoming')}[/dim]"
         )
 
-        # Subtitle: date · time · venue · weather
+        # Subtitle: date · time · venue (· weather if available)
         date_str = self.event.get("date", "")
         venue = competition.get("venue", {})
         stadium = venue.get("fullName", "")
@@ -451,11 +483,9 @@ class MatchDetail(Widget):
         if isinstance(weather_data, dict):
             wx = weather_data.get("displayValue") or weather_data.get("description") or ""
             temp = weather_data.get("temperature")
-            emoji = _get_weather_emoji(wx) if wx else "🌤️"
-            if temp is not None:
-                weather_part = f"{emoji} {temp}°C"
-            elif wx:
-                weather_part = f"{emoji} {wx}"
+            if wx or temp is not None:
+                emoji = _get_weather_emoji(wx) if wx else "🌤️"
+                weather_part = f"{emoji} {temp}°C" if temp is not None else f"{emoji} {wx}"
 
         subtitle_parts = []
         if date_str:
@@ -470,7 +500,7 @@ class MatchDetail(Widget):
         return [
             Vertical(
                 Static(
-                    f"{home_colored}  [bold yellow]{home_score}  -  {away_score}[/bold yellow]  {away_colored}",
+                    f"{home_colored}   {h_score}  [dim]–[/dim]  {a_score}   {away_colored}",
                     classes="header-score",
                 ),
                 Static(status_text, classes="header-status"),
@@ -481,20 +511,22 @@ class MatchDetail(Widget):
 
     def _build_league_panel(self) -> list[Widget]:
         """Compact league + round header above match overview."""
-        competition = self.event["competitions"][0]
-        # Competition/league name: prefer season.displayName, trim year prefix if present
-        season_raw = self.event.get("season", {}).get("displayName", "")
-        if season_raw:
-            # ESPN format: "2025-26 La Liga" → strip leading year token
-            parts = season_raw.split(" ", 1)
-            comp_name = parts[1] if len(parts) > 1 and "-" in parts[0] else season_raw
-        else:
-            notes = competition.get("notes", [])
-            comp_name = notes[0].get("headline", "") if notes else ""
+        # Use explicitly passed league name first (most reliable)
+        comp_name = self._league_name
 
-        # Round / Matchday
+        if not comp_name:
+            # Fall back: parse season slug e.g. "2025-26-laliga" -> "laliga"
+            season_raw = self.event.get("season", {}).get("displayName", "")
+            if season_raw:
+                parts = season_raw.split(" ", 1)
+                comp_name = parts[1] if len(parts) > 1 and "-" in parts[0] else season_raw
+            else:
+                notes = self.event["competitions"][0].get("notes", [])
+                comp_name = notes[0].get("headline", "") if notes else ""
+
+        # Round / Matchday from season slug e.g. "2025-26-laliga" or "regular-season-34"
         season = self.event.get("season", {})
-        week = season.get("slug", "")  # e.g. "regular-season-34"
+        week = season.get("slug", "")
         week_num = ""
         if week:
             parts = week.rsplit("-", 1)
@@ -539,7 +571,9 @@ class MatchDetail(Widget):
             elif emoji and wx:
                 weather_val = f"{emoji} {wx}"
 
-        officials = summary_comp.get("officials") or competition.get("officials") or []
+        # Officials come from summary.gameInfo, not header
+        game_info = (self.summary or {}).get("gameInfo", {})
+        officials = game_info.get("officials") or competition.get("officials") or []
         ref_val = ""
         if officials:
             head = next(
@@ -691,11 +725,11 @@ class MatchDetail(Widget):
         state = self.event["status"]["type"].get("state")
         if state not in ("in", "post"):
             return []
-        # exclude cards because they are in the cards panel
+        # Only scoring plays (cards are in the CARDS panel)
         lines = build_timeline(self.event, self.summary, filter_cards=True)
-        items = [Static("KEY EVENTS", classes="panel-header")]
+        items = [Static("GOALS", classes="panel-header")]
         if not lines:
-            items.append(Static("[dim]  No events yet[/dim]", classes="timeline"))
+            items.append(Static("[dim]  No goals yet[/dim]", classes="timeline"))
         else:
             items.append(Static("\n".join(lines), classes="timeline"))
         return [Vertical(*items, classes="panel")]
