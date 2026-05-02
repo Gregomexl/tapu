@@ -171,22 +171,13 @@ class LeagueScreen(Screen):
         self._positions: dict[str, int] = {}
         self._loaded_tabs: set[str] = set()
         self._prev_scores: dict[str, tuple[str, str]] = {}
-        self._status_filter: str = "all"
+        self._status_filter: str = "live"
         self._team_query: str = ""
         self._current_sb: dict = {}
-        self._live_cards: dict[str, MatchCard] = {}
 
     def compose(self) -> ComposeResult:
-        initial = "tab-main" if self.league.is_tournament else "tab-live"
         yield Header()
-        with TabbedContent(initial=initial):
-            if not self.league.is_tournament:
-                with TabPane("Live", id="tab-live"):
-                    yield VerticalScroll(
-                        Static("[dim]No live matches[/dim]", classes="no-matches"),
-                        id="live-pane",
-                        classes="matches-col",
-                    )
+        with TabbedContent():
             with TabPane(self.league.full_name, id="tab-main"):
                 if self.league.is_tournament:
                     # Full-width groups grid — no matches/standings split
@@ -199,8 +190,8 @@ class LeagueScreen(Screen):
                     with Horizontal(classes="main-row"):
                         with Vertical(classes="matches-col"):
                             with Horizontal(id="filter-bar", classes="filter-bar"):
-                                yield Button("All", id="chip-all", classes="filter-chip active")
-                                yield Button("Live", id="chip-live", classes="filter-chip")
+                                yield Button("All", id="chip-all", classes="filter-chip")
+                                yield Button("Live", id="chip-live", classes="filter-chip active")
                                 yield Button("Done", id="chip-done", classes="filter-chip")
                                 yield Button("Upcoming", id="chip-upcoming", classes="filter-chip")
                                 yield Input(placeholder="team…", id="filter-input")
@@ -267,8 +258,6 @@ class LeagueScreen(Screen):
                 flash_ids.add(eid)
             self._prev_scores[eid] = new_scores
 
-        await self._update_live_pane(all_events, flash_ids)
-
         pane = self.query_one("#matches-pane", VerticalScroll)
         events = _apply_filters(all_events, self._status_filter, self._team_query)
 
@@ -286,41 +275,6 @@ class LeagueScreen(Screen):
         with self.app.batch_update():
             await pane.remove_children()
             await pane.mount(*widgets)
-
-    async def _update_live_pane(self, all_events: list[dict], flash_ids: set[str]) -> None:
-        """In-place update of the live tab — no remove/remount, no blink."""
-        live_events = [e for e in all_events if e["status"]["type"].get("state") == "in"]
-        try:
-            pane = self.query_one("#live-pane", VerticalScroll)
-        except Exception:
-            return
-
-        new_ids = {e["id"] for e in live_events}
-        gone_ids = set(self._live_cards) - new_ids
-        for eid in gone_ids:
-            await self._live_cards.pop(eid).remove()
-
-        if not live_events:
-            if not any(isinstance(c, Static) for c in pane.children):
-                await pane.mount(Static("[dim]No live matches[/dim]", classes="no-matches"))
-            return
-
-        # Remove placeholder if present
-        for child in list(pane.children):
-            if isinstance(child, Static):
-                await child.remove()
-
-        to_mount: list[MatchCard] = []
-        for event in live_events:
-            eid = event["id"]
-            if eid in self._live_cards:
-                self._live_cards[eid]._update_state(event, flash=eid in flash_ids)
-            else:
-                card = MatchCard(event, client=self.client, positions=self._positions)
-                self._live_cards[eid] = card
-                to_mount.append(card)
-        if to_mount:
-            await pane.mount(*to_mount)
 
     async def _render_standings(self, standings: dict) -> None:
         pane = self.query_one("#standings-pane", VerticalScroll)
@@ -388,7 +342,7 @@ class LeagueScreen(Screen):
 
     def on_tabbed_content_tab_activated(self, event: TabbedContent.TabActivated) -> None:
         pane_id = event.pane.id if event.pane else None
-        if not pane_id or pane_id in ("tab-main", "tab-live") or pane_id in self._loaded_tabs:
+        if not pane_id or pane_id == "tab-main" or pane_id in self._loaded_tabs:
             return
         self._loaded_tabs.add(pane_id)
         if pane_id == "tab-bracket" and (self.league.is_tournament or self.league.has_bracket):
@@ -511,7 +465,7 @@ class LeagueScreen(Screen):
     def action_refresh(self) -> None:
         self.client.clear_cache(disk=True)
         active = self.query_one(TabbedContent).active
-        if active in ("tab-main", "tab-live") or not active:
+        if active == "tab-main" or not active:
             self.run_worker(self._load_main())
         elif active == "tab-bracket":
             self._loaded_tabs.discard(active)
