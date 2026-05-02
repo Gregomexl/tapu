@@ -212,6 +212,27 @@ class MatchCard(Widget, can_focus=True):
         if second_line:
             yield Static(f"[dim]{second_line}[/dim]")
 
+    def _update_state(self, event: dict, flash: bool = False) -> None:
+        """Update card data in-place — avoids a remount and its blink."""
+        self.event = event
+        competitors = event["competitions"][0]["competitors"]
+        self._home = _get_team(competitors, "home")
+        self._away = _get_team(competitors, "away")
+        status_type = event["status"]["type"]
+        state = status_type.get("state", "pre")
+        name = status_type.get("name", "")
+        self._is_ht = state == "in" and ("HALFTIME" in name.upper() or "HALF_TIME" in name.upper())
+        self.is_live = state == "in"
+        if self.is_live and not self._is_ht:
+            self.add_class("live")
+        else:
+            self.remove_class("live")
+        with contextlib.suppress(Exception):
+            self.query_one("#line1", Static).update(self._render_line1())
+        if flash and not self.has_class("--flashing"):
+            self.add_class("--flashing")
+            self.set_timer(3.0, lambda: self.remove_class("--flashing"))
+
     def action_select(self) -> None:
         self.post_message(self.Selected(self.event["id"], self.event))
 
