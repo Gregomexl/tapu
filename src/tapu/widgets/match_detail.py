@@ -448,9 +448,9 @@ class MatchDetail(Widget):
 
     def _build_match_overview(self) -> list[Widget]:
         competition = self.event["competitions"][0]
-        comp_name = self.event.get("season", {}).get("displayName", "") or competition.get("notes", [{}])[0].get(
-            "headline", "Competition"
-        )
+        notes = competition.get("notes", [])
+        headline = notes[0].get("headline", "Competition") if notes else "Competition"
+        comp_name = self.event.get("season", {}).get("displayName", "") or headline
 
         status = self.event["status"]["type"]
         is_live = status.get("state") == "in"
