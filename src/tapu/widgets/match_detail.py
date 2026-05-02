@@ -25,9 +25,16 @@ def resolve_team_colors(home: dict, away: dict) -> tuple[str, str]:
     home_hex = _hex_color(home.get("team", {}))
     away_hex = _hex_color(away.get("team", {}))
 
-    # Avoid showing the same color for both teams
-    if home_hex and away_hex and home_hex.lower() == away_hex.lower():
-        away_hex = ""
+    # Avoid showing similar colors for both teams
+    if home_hex and away_hex:
+        try:
+            r1, g1, b1 = int(home_hex[0:2], 16), int(home_hex[2:4], 16), int(home_hex[4:6], 16)
+            r2, g2, b2 = int(away_hex[0:2], 16), int(away_hex[2:4], 16), int(away_hex[4:6], 16)
+            distance = ((r1 - r2)**2 + (g1 - g2)**2 + (b1 - b2)**2) ** 0.5
+            if distance < 65:  # threshold for visual similarity
+                away_hex = ""
+        except ValueError:
+            pass
 
     home_color = f"#{home_hex}" if home_hex else "white"
     away_color = f"#{away_hex}" if away_hex else "cyan"
