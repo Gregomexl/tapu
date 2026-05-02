@@ -2,9 +2,11 @@ from datetime import datetime
 from typing import Any
 
 from textual.app import ComposeResult
-from textual.containers import Horizontal, Vertical, VerticalScroll
+from textual.containers import Horizontal, Vertical, VerticalScroll, Container
 from textual.widget import Widget
-from textual.widgets import Static
+from textual.widgets import Static, Button
+from textual.screen import ModalScreen
+from textual import on
 
 from tapu.widgets.match_card import format_live_status
 
@@ -286,6 +288,71 @@ STAT_KEYS = [
 ]
 
 
+def _get_event_icon(text: str) -> str:
+    t = text.lower()
+    if "corner" in t:
+        return "[yellow]🚩[/yellow]"
+    if "yellow card" in t:
+        return "[yellow]█[/yellow]"
+    if "red card" in t:
+        return "[red]█[/red]"
+    if "free kick" in t:
+        return "[green]●[/green]"
+    if "foul" in t:
+        return "[red]●[/red]"
+    if "goal" in t:
+        return "⚽"
+    if "substitution" in t:
+        return "🔄"
+    return " "
+
+
+class TimelineModal(ModalScreen):
+    DEFAULT_CSS = """
+    TimelineModal {
+        align: center middle;
+    }
+    TimelineModal Container {
+        width: 80;
+        height: 30;
+        background: $surface;
+        border: thick $primary;
+        padding: 1;
+    }
+    TimelineModal .timeline-row {
+        height: auto;
+        padding: 0 1;
+        margin-bottom: 1;
+        border-bottom: thin $surface-lighten-1;
+    }
+    TimelineModal .close-btn {
+        margin-top: 1;
+        width: 100%;
+    }
+    """
+
+    def __init__(self, event: dict, summary: dict):
+        super().__init__()
+        self.event = event
+        self.summary = summary
+
+    def compose(self) -> ComposeResult:
+        commentary = self.summary.get("commentary", []) or []
+        with Container():
+            yield Static("MATCH TIMELINE", classes="panel-header")
+            with VerticalScroll(id="timeline-list"):
+                for c in reversed(commentary):
+                    min_val = c.get("time", {}).get("displayValue", "")
+                    text = c.get("text", "")
+                    icon = _get_event_icon(text)
+                    yield Static(f"[bold]{min_val:>3}'[/bold]  |  {icon}  {text}", classes="timeline-row")
+            yield Button("Close", id="close-modal", classes="close-btn")
+
+    @on(Button.Pressed, "#close-modal")
+    def close(self):
+        self.app.pop_screen()
+
+
 class MatchDetail(Widget):
     DEFAULT_CSS = """
     MatchDetail {
@@ -414,6 +481,12 @@ class MatchDetail(Widget):
         border-bottom: solid $surface-lighten-2;
         color: $text;
     }
+    MatchDetail .timeline-btn {
+        margin-top: 1;
+        height: 3;
+        width: 100%;
+        background: $primary 20%;
+    }
     """
 
     def __init__(
@@ -450,7 +523,11 @@ class MatchDetail(Widget):
                     with VerticalScroll(classes="right-col"):
                         yield from self._build_cards()
                         yield from self._build_key_events()
-                        yield from self._build_commentary()
+                        # Removed full commentary from right column as it's now in a modal
+
+    @on(Button.Pressed, "#view-timeline")
+    def show_timeline(self):
+        self.app.push_screen(TimelineModal(self.event, self.summary))
 
     def _build_header(self) -> list[Widget]:
         competition = self.event["competitions"][0]
@@ -666,6 +743,7 @@ class MatchDetail(Widget):
             Vertical(
                 Static("LIVE FEED", classes="panel-header"),
                 Static("\n".join(lines), classes="commentary"),
+                Button("View full timeline", id="view-timeline", classes="timeline-btn"),
                 classes="panel",
             )
         ]
