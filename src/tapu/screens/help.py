@@ -31,11 +31,11 @@ class HelpScreen(ModalScreen):
 
     def __init__(self, bindings: list[Binding]) -> None:
         super().__init__()
-        self._bindings = bindings
+        self._help_bindings = bindings
 
     def compose(self) -> ComposeResult:
-        visible = [b for b in self._bindings if b.show]
-        hidden = [b for b in self._bindings if not b.show]
+        visible = [b for b in self._help_bindings if b.show]
+        hidden = [b for b in self._help_bindings if not b.show]
 
         lines: list[str] = ["[bold]Key Bindings[/bold]\n"]
         if visible:

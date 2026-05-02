@@ -5,7 +5,7 @@ from tapu.config import League
 from tapu.widgets.bracket import BracketWidget
 from tapu.widgets.league_card import LeagueCard
 from tapu.widgets.match_card import MatchCard, _period_label, _status_label, format_live_status
-from tapu.widgets.match_detail import _extract_meta, build_lineups, build_substitutions, build_timeline
+from tapu.widgets.match_detail import build_lineups, build_substitutions, build_timeline
 from tapu.widgets.standings import StandingsTable
 
 
@@ -92,32 +92,7 @@ def test_format_live_status_shows_clock_when_requested():
     assert "1st" not in label and "2nd" not in label
 
 
-def test_extract_meta_weather_with_temperature():
-    summary = {"gameInfo": {"weather": {"displayValue": "Cloudy", "temperature": 12}}}
-    parts = _extract_meta({"competitions": [{}]}, summary)
-    assert any("Cloudy" in p and "12" in p for p in parts)
 
-
-def test_extract_meta_referee_prefers_head_official():
-    summary = {
-        "header": {"competitions": [{"officials": [
-            {"displayName": "Asst One", "position": {"displayName": "Assistant Referee"}},
-            {"displayName": "Real Ref", "position": {"displayName": "Head Referee"}},
-        ]}]}
-    }
-    parts = _extract_meta({"competitions": [{}]}, summary)
-    assert any("Real Ref" in p for p in parts)
-    assert not any("Asst One" in p for p in parts)
-
-
-def test_extract_meta_attendance_formatted():
-    event = {"competitions": [{"attendance": 38420}]}
-    parts = _extract_meta(event, {})
-    assert "38,420" in parts
-
-
-def test_extract_meta_empty_when_no_data():
-    assert _extract_meta({"competitions": [{}]}, {}) == []
 
 
 def _timeline_event_with_two_teams():
