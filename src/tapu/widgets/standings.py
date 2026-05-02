@@ -152,7 +152,7 @@ class StandingsTable(Widget):
         height: auto;
     }
     StandingsTable .table-header {
-        color: $text;
+        color: $accent;
         text-style: bold;
         padding: 0 0 1 0;
     }
@@ -162,17 +162,18 @@ class StandingsTable(Widget):
     }
     StandingsTable DataTable {
         height: auto;
-        max-height: 28;
+        max-height: 30;
         margin: 0 0 1 0;
     }
     StandingsTable Label {
-        color: $primary;
+        color: $accent;
         text-style: bold;
         padding: 1 0 0 0;
     }
     StandingsTable .legend {
         padding: 1 0 0 0;
         color: $text-muted;
+        text-style: italic;
     }
     """
 

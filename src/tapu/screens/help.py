@@ -1,31 +1,30 @@
 from __future__ import annotations
 
-from typing import ClassVar
-
 from textual.app import ComposeResult
-from textual.binding import Binding, BindingType
+from textual.binding import Binding
 from textual.containers import Vertical, VerticalScroll
+from textual.events import Key
 from textual.screen import ModalScreen
 from textual.widgets import Static
 
 
 class HelpScreen(ModalScreen):
-    BINDINGS: ClassVar[list[BindingType]] = [
-        Binding("escape", "dismiss", "Close", show=False),
-        Binding("?", "dismiss", "Close", show=False),
-    ]
-
     DEFAULT_CSS = """
     HelpScreen {
         align: center middle;
     }
     #help-container {
-        width: 70;
+        width: 68;
         height: auto;
         max-height: 80%;
-        border: solid $primary;
+        border: round $primary;
         background: $surface;
         padding: 1 2;
+    }
+    #help-container VerticalScroll {
+        height: auto;
+        max-height: 60vh;
+        scrollbar-size: 1 1;
     }
     """
 
@@ -40,7 +39,7 @@ class HelpScreen(ModalScreen):
         lines: list[str] = ["[bold]Key Bindings[/bold]\n"]
         if visible:
             for b in visible:
-                lines.append(f"  [bold cyan]{b.key:<12}[/bold cyan] {b.description}")
+                lines.append(f"  [bold $accent]{b.key:<12}[/bold $accent] {b.description}")
         if hidden:
             lines.append("\n[dim]Hidden shortcuts[/dim]")
             for b in hidden:
@@ -52,5 +51,7 @@ class HelpScreen(ModalScreen):
         with Vertical(id="help-container"):
             yield VerticalScroll(Static("\n".join(lines)))
 
-    def action_dismiss(self) -> None:
-        self.dismiss()
+    def on_key(self, event: Key) -> None:
+        if event.key in ("escape", "question_mark"):
+            self.dismiss()
+            event.stop()

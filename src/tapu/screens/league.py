@@ -113,16 +113,16 @@ class LeagueScreen(Screen):
     LeagueScreen .matches-col {
         width: 1fr;
         height: 1fr;
-        padding: 1;
+        padding: 0 1 1 1;
     }
     LeagueScreen .standings-col {
         width: 56;
         height: 1fr;
         border-left: solid $surface-lighten-2;
-        padding: 1 1 1 1;
+        padding: 1 2;
     }
     LeagueScreen .no-matches {
-        padding: 2;
+        padding: 2 1;
         color: $text-muted;
     }
     LeagueScreen .section-header {
@@ -145,11 +145,12 @@ class LeagueScreen(Screen):
         background: $surface-lighten-1;
         color: $text-muted;
         height: 3;
-        min-width: 8;
+        min-width: 10;
     }
     LeagueScreen .filter-chip.active {
-        background: $primary;
-        color: $text;
+        background: $accent;
+        color: $background;
+        text-style: bold;
     }
     LeagueScreen #filter-input {
         width: 1fr;
@@ -157,6 +158,7 @@ class LeagueScreen(Screen):
         background: $surface-lighten-1;
         margin-left: 1;
         height: 3;
+        color: $text;
     }
     """
 

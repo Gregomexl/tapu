@@ -59,7 +59,7 @@ def format_live_status(event: dict, pulse_on: bool = True, *, show_clock: bool =
     if state == "in":
         name = status.get("name", "").upper()
         is_ht = "HALFTIME" in name or "HALF_TIME" in name
-        dot = "[green]●[/green]" if pulse_on else " "
+        dot = "[green]⬤[/green]" if pulse_on else " "
         if is_ht:
             return f"{dot} [bold yellow]HT[/bold yellow]"
         if show_clock:
@@ -95,28 +95,29 @@ class MatchCard(Widget, can_focus=True):
     DEFAULT_CSS = """
     MatchCard {
         height: auto;
-        padding: 1 1;
+        padding: 1 2;
         margin: 0 0 1 0;
-        border: solid $surface-lighten-2;
+        border: round $surface-lighten-2;
     }
     MatchCard:hover {
         background: $surface-lighten-1;
+        border: round $surface-lighten-3;
     }
     MatchCard:focus {
-        border: solid $primary;
-        background: $surface-lighten-2;
+        border: round $primary;
+        background: $surface-lighten-1;
     }
     MatchCard.live {
-        border: solid $success;
+        border: round $success;
         background: $surface-darken-1;
     }
     MatchCard.live:focus {
-        border: solid $success;
-        background: $surface-lighten-2;
+        border: round $success;
+        background: $surface-lighten-1;
     }
     MatchCard.--flashing {
-        border: tall $success;
-        background: $success 10%;
+        border: round $success;
+        background: $success 8%;
     }
     MatchCard.--flashing #line1 {
         color: $success;

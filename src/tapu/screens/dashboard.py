@@ -32,7 +32,7 @@ class DashboardScreen(Screen):
     DashboardScreen .splash {
         width: 100%;
         padding: 1 2;
-        color: $success;
+        color: $accent;
         overflow: hidden;
         text-align: center;
         content-align: center middle;
@@ -45,7 +45,7 @@ class DashboardScreen(Screen):
     DashboardScreen LoadingIndicator {
         height: 3;
         background: transparent;
-        color: $success;
+        color: $accent;
     }
     """
 

@@ -1,12 +1,12 @@
 from datetime import datetime
 from typing import Any
 
-from textual.app import ComposeResult
-from textual.containers import Horizontal, Vertical, VerticalScroll, Container
-from textual.widget import Widget
-from textual.widgets import Static, Button
-from textual.screen import ModalScreen
 from textual import on
+from textual.app import ComposeResult
+from textual.containers import Container, Horizontal, Vertical, VerticalScroll
+from textual.screen import ModalScreen
+from textual.widget import Widget
+from textual.widgets import Button, Static
 
 from tapu.widgets.match_card import format_live_status
 
@@ -160,7 +160,7 @@ def _format_formation(formation: Any) -> str:
 def _format_lineup_section(team_roster: dict, team_color: str | None = None) -> list[str]:
     team = team_roster.get("team", {}) or {}
     team_name = team.get("displayName", "") or ""
-    
+
     if team_color is None:
         color = team.get("color", "") or ""
         team_color = f"#{color}" if len(color) == 6 else "white"
@@ -206,7 +206,7 @@ def build_lineups(event: dict, summary: dict) -> list[list[str]]:
     home_comp = next((c for c in competitors if c.get("homeAway") == "home"), {})
     away_comp = next((c for c in competitors if c.get("homeAway") == "away"), {})
     home_id = str(home_comp.get("team", {}).get("id", ""))
-    
+
     home_color, away_color = resolve_team_colors(home_comp, away_comp)
 
     by_id = {str(r.get("team", {}).get("id", "")): r for r in rosters}
@@ -316,7 +316,7 @@ class TimelineModal(ModalScreen):
         width: 80;
         height: 30;
         background: $surface;
-        border: thick $primary;
+        border: round $primary;
         padding: 1;
     }
     TimelineModal .timeline-row {
@@ -388,7 +388,7 @@ class MatchDetail(Widget):
         padding: 1 0;
         height: 5;
         content-align: center middle;
-        border: thick $surface-lighten-1;
+        border: round $surface-lighten-2;
         margin: 0 4;
         background: $surface-lighten-1 10%;
     }
@@ -414,13 +414,13 @@ class MatchDetail(Widget):
         scrollbar-size: 0 0;
     }
     MatchDetail .panel {
-        border: solid $surface-lighten-2;
+        border: round $surface-lighten-2;
         padding: 0 1;
         margin-bottom: 1;
         height: auto;
     }
     MatchDetail .panel-header {
-        color: $primary;
+        color: $accent;
         text-style: bold;
         text-align: left;
         margin-bottom: 1;
@@ -779,7 +779,7 @@ class MatchDetail(Widget):
         home = _get_team(competitors, "home")
         away = _get_team(competitors, "away")
         home_id = str(home["team"]["id"])
-        
+
         home_color, away_color = resolve_team_colors(home, away)
 
         home_abbr = home["team"].get("shortDisplayName") or home["team"]["abbreviation"]

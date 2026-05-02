@@ -19,6 +19,7 @@ SPLASH = """\
 class TapuApp(App):
     TITLE = "Tapú"
     SUB_TITLE = "fútbol en tu terminal"
+    THEME = "tokyo-night"
 
     BINDINGS: ClassVar[list[BindingType]] = [
         Binding("g", "open_palette", "Go to league"),
@@ -33,7 +34,7 @@ class TapuApp(App):
         width: 100%;
         height: auto;
         padding: 1 2;
-        color: $success;
+        color: $accent;
         text-align: left;
     }
     """

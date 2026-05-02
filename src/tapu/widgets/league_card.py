@@ -24,23 +24,24 @@ class LeagueCard(Widget, can_focus=True):
         height: 6;
         width: 1fr;
         min-width: 24;
-        padding: 1 1;
+        padding: 1 2;
         margin: 0 1 1 0;
-        border: solid $surface-lighten-2;
+        border: round $surface-lighten-2;
     }
     LeagueCard:hover {
+        border: round $surface-lighten-3;
         background: $surface-lighten-1;
     }
     LeagueCard:focus {
-        border: solid $primary;
-        background: $surface-lighten-2;
+        border: round $primary;
+        background: $surface-lighten-1;
     }
     LeagueCard.has-live {
-        border: solid $success;
+        border: round $success;
     }
     LeagueCard.has-live:focus {
-        border: solid $success;
-        background: $surface-lighten-2;
+        border: round $success;
+        background: $surface-lighten-1;
     }
     """
 
@@ -67,7 +68,7 @@ class LeagueCard(Widget, can_focus=True):
         events = self.scoreboard.get("events", [])
         total = len(events)
         if self.live_count > 0:
-            match_label = f"[bold green]{self.live_count} live[/bold green][dim] · {total} today[/dim]"
+            match_label = f"[bold green]⬤ {self.live_count} live[/bold green][dim]  ·  {total} today[/dim]"
         elif total > 0:
             match_label = f"[dim]{total} matches today[/dim]"
         else:
