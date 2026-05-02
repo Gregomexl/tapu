@@ -169,7 +169,7 @@ def _format_lineup_section(team_roster: dict, team_color: str | None = None) -> 
     bench = [p for p in roster if not p.get("starter")]
 
     lines: list[str] = []
-    header = f"[{team_color}]■[/{team_color}] [white][bold]{team_name}[/bold][/white]"
+    header = f"[{team_color}][bold]{team_name}[/bold][/{team_color}]"
 
     if formation:
         header += f"  [dim]{formation}[/dim]"
@@ -257,7 +257,7 @@ def _fmt_stat(raw: str, is_pct: bool = False) -> str:
         return raw
 
 
-def _stat_bar(home_raw: str, away_raw: str, width: int = 12) -> tuple[str, str]:
+def _stat_bar(home_raw: str, away_raw: str, home_color: str, away_color: str, width: int = 12) -> tuple[str, str]:
     try:
         hv = float(home_raw.replace("%", "").strip())
         av = float(away_raw.replace("%", "").strip())
@@ -268,8 +268,8 @@ def _stat_bar(home_raw: str, away_raw: str, width: int = 12) -> tuple[str, str]:
         return "░" * width, "░" * width
     h_fill = round(hv / total * width)
     a_fill = round(av / total * width)
-    home_bar = f"[green]{'█' * h_fill}[/green][dim]{'░' * (width - h_fill)}[/dim]"
-    away_bar = f"[dim]{'░' * (width - a_fill)}[/dim][red]{'█' * a_fill}[/red]"
+    home_bar = f"[{home_color}]{'█' * h_fill}[/{home_color}][dim]{'░' * (width - h_fill)}[/dim]"
+    away_bar = f"[dim]{'░' * (width - a_fill)}[/dim][{away_color}]{'█' * a_fill}[/{away_color}]"
     return home_bar, away_bar
 
 
@@ -318,8 +318,11 @@ class MatchDetail(Widget):
     MatchDetail .header-score {
         text-align: center;
         padding: 1 0;
-        height: 4;
+        height: 6;
         content-align: center middle;
+        border: heavy $surface-lighten-1;
+        margin: 0 4;
+        background: $surface-lighten-1 10%;
     }
     MatchDetail .header-status {
         text-align: center;
@@ -467,8 +470,8 @@ class MatchDetail(Widget):
 
         home_color, away_color = resolve_team_colors(home, away)
 
-        home_colored = f"[{home_color}]■[/{home_color}] [white][bold]{home_name.upper()}[/bold][/white]"
-        away_colored = f"[white][bold]{away_name.upper()}[/bold][/white] [{away_color}]■[/{away_color}]"
+        home_colored = f"[{home_color}][bold]{home_name.upper()}[/bold][/{home_color}]"
+        away_colored = f"[{away_color}][bold]{away_name.upper()}[/bold][/{away_color}]"
 
         # Score: highlight winner/leader; dim loser; both yellow when level
         if state in ("in", "post") and home_score_int >= 0 and away_score_int >= 0:
@@ -519,7 +522,7 @@ class MatchDetail(Widget):
         return [
             Vertical(
                 Static(
-                    f"{home_colored}   {h_score}  [dim]–[/dim]  {a_score}   {away_colored}",
+                    f"{home_colored}    {h_score}  [dim]—[/dim]  {a_score}    {away_colored}",
                     classes="header-score",
                 ),
                 Static(status_text, classes="header-status"),
@@ -644,7 +647,7 @@ class MatchDetail(Widget):
     def _build_live_feed(self) -> list[Widget]:
         """Show the most recent 8 commentary entries as a live feed."""
         state = self.event["status"]["type"].get("state")
-        if state != "in":
+        if state not in ("in", "post"):
             return []
         commentary = (self.summary or {}).get("commentary", []) or []
         recent = [c for c in commentary if c.get("text")][:8]
@@ -711,7 +714,7 @@ class MatchDetail(Widget):
         items: list[Widget] = [
             Static("MATCH STATS", classes="panel-header"),
             Static(
-                f"[{home_color}]■[/{home_color}] [white][bold]{home_abbr}[/bold][/white]                                   [white][bold]{away_abbr}[/bold][/white] [{away_color}]■[/{away_color}]",
+                f"[{home_color}][bold]{home_abbr}[/bold][/{home_color}]                                   [{away_color}][bold]{away_abbr}[/bold][/{away_color}]",
                 classes="stats-header",
             ),
         ]
@@ -719,12 +722,12 @@ class MatchDetail(Widget):
             hv, av = h.get(key, "-"), a.get(key, "-")
             if hv == "-" and av == "-":
                 continue
-            home_bar, away_bar = _stat_bar(hv, av, width=10)
+            home_bar, away_bar = _stat_bar(hv, av, home_color, away_color, width=10)
             hv_display = _fmt_stat(hv, is_pct)
             av_display = _fmt_stat(av, is_pct)
             items.append(
                 Static(
-                    f"[white][bold]{hv_display:>5}[/bold][/white] {home_bar} [dim]{label:^10}[/dim] {away_bar} [white][bold]{av_display:<5}[/bold][/white]",
+                    f"[{home_color}][bold]{hv_display:>5}[/bold][/{home_color}] {home_bar} [dim]{label:^10}[/dim] {away_bar} [{away_color}][bold]{av_display:<5}[/bold][/{away_color}]",
                     classes="stat-row",
                 )
             )
