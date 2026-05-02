@@ -386,9 +386,9 @@ class MatchDetail(Widget):
     MatchDetail .header-score {
         text-align: center;
         padding: 1 0;
-        height: 6;
+        height: 8;
         content-align: center middle;
-        border: heavy $surface-lighten-1;
+        border: thick $surface-lighten-1;
         margin: 0 4;
         background: $surface-lighten-1 10%;
     }
