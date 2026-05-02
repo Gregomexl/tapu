@@ -323,7 +323,7 @@ class TimelineModal(ModalScreen):
         height: auto;
         padding: 0 1;
         margin-bottom: 1;
-        border-bottom: thin $surface-lighten-1;
+        border-bottom: solid $surface-lighten-1;
     }
     TimelineModal .close-btn {
         margin-top: 1;
