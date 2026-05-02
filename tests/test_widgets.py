@@ -227,9 +227,9 @@ def test_build_lineups_renders_formation_in_header():
 def test_build_lineups_prepends_color_badge_to_team_header():
     event = _timeline_event_with_two_teams()
     summary = _lineup_summary()
-    # _lineup_summary() doesn't carry team.color; inject one for this test.
-    summary["rosters"][0]["team"]["color"] = "FFFFFF"
-    summary["rosters"][1]["team"]["color"] = "A50044"
+    # resolve_team_colors now reads from event["competitions"][0]["competitors"]
+    event["competitions"][0]["competitors"][0]["team"]["color"] = "FFFFFF"
+    event["competitions"][0]["competitors"][1]["team"]["color"] = "A50044"
     home_lines, away_lines = build_lineups(event, summary)
     assert "#FFFFFF" in home_lines[0]
     assert "#A50044" in away_lines[0]

@@ -11,9 +11,28 @@ from tapu.widgets.match_card import format_live_status
 
 def _get_team(competitors: list[dict], home_away: str) -> dict:
     for c in competitors:
-        if c["homeAway"] == home_away:
+        if c.get("homeAway") == home_away:
             return c
-    return competitors[0]
+    return competitors[0] if competitors else {}
+
+
+def resolve_team_colors(home: dict, away: dict) -> tuple[str, str]:
+    """Return non-colliding colors for home and away teams."""
+    def _hex_color(team: dict) -> str:
+        color = team.get("color", "")
+        return color if len(color) == 6 else ""
+
+    home_hex = _hex_color(home.get("team", {}))
+    away_hex = _hex_color(away.get("team", {}))
+
+    # Avoid showing the same color for both teams
+    if home_hex and away_hex and home_hex.lower() == away_hex.lower():
+        away_hex = ""
+
+    home_color = f"#{home_hex}" if home_hex else "white"
+    away_color = f"#{away_hex}" if away_hex else "cyan"
+
+    return home_color, away_color
 
 
 def _team_abbrs(event: dict) -> dict[str, str]:
@@ -129,11 +148,13 @@ def _format_formation(formation: Any) -> str:
     return formation or ""
 
 
-def _format_lineup_section(team_roster: dict) -> list[str]:
+def _format_lineup_section(team_roster: dict, team_color: str | None = None) -> list[str]:
     team = team_roster.get("team", {}) or {}
     team_name = team.get("displayName", "") or ""
-    color = team.get("color", "") or ""
-    hex_color = f"#{color}" if len(color) == 6 else None
+    
+    if team_color is None:
+        color = team.get("color", "") or ""
+        team_color = f"#{color}" if len(color) == 6 else "white"
 
     formation = _format_formation(team_roster.get("formation"))
     roster = team_roster.get("roster") or []
@@ -141,7 +162,7 @@ def _format_lineup_section(team_roster: dict) -> list[str]:
     bench = [p for p in roster if not p.get("starter")]
 
     lines: list[str] = []
-    header = f"[{hex_color}][bold]{team_name}[/bold][/{hex_color}]" if hex_color else f"[bold]{team_name}[/bold]"
+    header = f"[{team_color}][bold]{team_name}[/bold][/{team_color}]"
 
     if formation:
         header += f"  [dim]{formation}[/dim]"
@@ -173,16 +194,18 @@ def build_lineups(event: dict, summary: dict) -> list[list[str]]:
         return []
 
     competitors = event.get("competitions", [{}])[0].get("competitors", [])
-    home_id = next(
-        (str(c.get("team", {}).get("id", "")) for c in competitors if c.get("homeAway") == "home"),
-        "",
-    )
+    home_comp = next((c for c in competitors if c.get("homeAway") == "home"), {})
+    away_comp = next((c for c in competitors if c.get("homeAway") == "away"), {})
+    home_id = str(home_comp.get("team", {}).get("id", ""))
+    
+    home_color, away_color = resolve_team_colors(home_comp, away_comp)
+
     by_id = {str(r.get("team", {}).get("id", "")): r for r in rosters}
     home = by_id.get(home_id)
     away = next((r for tid, r in by_id.items() if tid != home_id), None)
 
     if home and away:
-        return [_format_lineup_section(home), _format_lineup_section(away)]
+        return [_format_lineup_section(home, home_color), _format_lineup_section(away, away_color)]
     return [_format_lineup_section(r) for r in rosters[:2]]
 
 
@@ -227,7 +250,7 @@ def _fmt_stat(raw: str, is_pct: bool = False) -> str:
         return raw
 
 
-def _stat_bar(home_raw: str, away_raw: str, width: int = 12) -> tuple[str, str]:
+def _stat_bar(home_raw: str, away_raw: str, home_color: str, away_color: str, width: int = 12) -> tuple[str, str]:
     try:
         hv = float(home_raw.replace("%", "").strip())
         av = float(away_raw.replace("%", "").strip())
@@ -238,8 +261,8 @@ def _stat_bar(home_raw: str, away_raw: str, width: int = 12) -> tuple[str, str]:
         return "░" * width, "░" * width
     h_fill = round(hv / total * width)
     a_fill = round(av / total * width)
-    home_bar = f"[green]{'█' * h_fill}[/green][dim]{'░' * (width - h_fill)}[/dim]"
-    away_bar = f"[dim]{'░' * (width - a_fill)}[/dim][red]{'█' * a_fill}[/red]"
+    home_bar = f"[{home_color}]{'█' * h_fill}[/{home_color}][dim]{'░' * (width - h_fill)}[/dim]"
+    away_bar = f"[dim]{'░' * (width - a_fill)}[/dim][{away_color}]{'█' * a_fill}[/{away_color}]"
     return home_bar, away_bar
 
 
@@ -281,14 +304,15 @@ class MatchDetail(Widget):
     MatchDetail .header-panel {
         width: 100%;
         text-align: center;
-        padding: 1 0;
+        padding: 2 0;
         margin-bottom: 1;
         height: auto;
     }
     MatchDetail .header-score {
         text-align: center;
         padding: 1 0;
-        height: 3;
+        height: 4;
+        content-align: center middle;
     }
     MatchDetail .header-status {
         text-align: center;
@@ -434,19 +458,7 @@ class MatchDetail(Widget):
         home_name = home["team"]["displayName"]
         away_name = away["team"]["displayName"]
 
-        def _hex_color(team: dict) -> str:
-            color = team.get("color", "")
-            return color if len(color) == 6 else ""
-
-        home_hex = _hex_color(home["team"])
-        away_hex = _hex_color(away["team"])
-
-        # Avoid showing the same color for both teams
-        if home_hex and away_hex and home_hex.lower() == away_hex.lower():
-            away_hex = ""
-
-        home_color = f"#{home_hex}" if home_hex else "white"
-        away_color = f"#{away_hex}" if away_hex else "cyan"
+        home_color, away_color = resolve_team_colors(home, away)
 
         home_colored = f"[{home_color}][bold]{home_name.upper()}[/bold][/{home_color}]"
         away_colored = f"[{away_color}][bold]{away_name.upper()}[/bold][/{away_color}]"
@@ -676,6 +688,8 @@ class MatchDetail(Widget):
         home = _get_team(competitors, "home")
         away = _get_team(competitors, "away")
         home_id = str(home["team"]["id"])
+        
+        home_color, away_color = resolve_team_colors(home, away)
 
         home_abbr = home["team"].get("shortDisplayName") or home["team"]["abbreviation"]
         away_abbr = away["team"].get("shortDisplayName") or away["team"]["abbreviation"]
@@ -690,7 +704,7 @@ class MatchDetail(Widget):
         items: list[Widget] = [
             Static("MATCH STATS", classes="panel-header"),
             Static(
-                f"[bold]{home_abbr}[/bold]                                   [bold]{away_abbr}[/bold]",
+                f"[{home_color}][bold]{home_abbr}[/bold][/{home_color}]                                   [{away_color}][bold]{away_abbr}[/bold][/{away_color}]",
                 classes="stats-header",
             ),
         ]
@@ -698,12 +712,12 @@ class MatchDetail(Widget):
             hv, av = h.get(key, "-"), a.get(key, "-")
             if hv == "-" and av == "-":
                 continue
-            home_bar, away_bar = _stat_bar(hv, av, width=10)
+            home_bar, away_bar = _stat_bar(hv, av, home_color, away_color, width=10)
             hv_display = _fmt_stat(hv, is_pct)
             av_display = _fmt_stat(av, is_pct)
             items.append(
                 Static(
-                    f"[bold]{hv_display:>5}[/bold] {home_bar} [dim]{label:^10}[/dim] {away_bar} [bold]{av_display:<5}[/bold]",
+                    f"[{home_color}][bold]{hv_display:>5}[/bold][/{home_color}] {home_bar} [dim]{label:^10}[/dim] {away_bar} [{away_color}][bold]{av_display:<5}[/bold][/{away_color}]",
                     classes="stat-row",
                 )
             )
