@@ -303,7 +303,7 @@ class MatchDetail(Widget):
         height: 100%;
         padding: 0 1;
         margin-right: 1;
-        scrollbar-size: 0;
+        scrollbar-size: 0 0;
     }
     MatchDetail .main-content {
         width: 75%;
@@ -338,13 +338,13 @@ class MatchDetail(Widget):
         height: 100%;
         padding: 0 1;
         margin-right: 1;
-        scrollbar-size: 0;
+        scrollbar-size: 0 0;
     }
     MatchDetail .right-col {
         width: 35%;
         height: 100%;
         padding: 0 1;
-        scrollbar-size: 0;
+        scrollbar-size: 0 0;
     }
     MatchDetail .panel {
         border: solid $surface-lighten-2;
