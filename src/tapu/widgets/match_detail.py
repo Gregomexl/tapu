@@ -650,7 +650,7 @@ class MatchDetail(Widget):
         if state not in ("in", "post"):
             return []
         commentary = (self.summary or {}).get("commentary", []) or []
-        recent = [c for c in commentary if c.get("text")][:8]
+        recent = [c for c in commentary if c.get("text")][-8:][::-1]
         if not recent:
             return []
         lines = []
@@ -676,7 +676,7 @@ class MatchDetail(Widget):
         if not commentary:
             return []
         lines = []
-        for c in commentary:
+        for c in reversed(commentary):
             minute = c.get("time", {}).get("displayValue", "")
             text = c.get("text", "")
             prefix = f"[dim]{minute:>3}'[/dim]  " if minute else "      "
