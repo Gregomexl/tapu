@@ -297,13 +297,13 @@ class MatchDetail(Widget):
         height: 1fr;
     }
     MatchDetail .center-col {
-        width: 55%;
+        width: 65%;
         height: 100%;
         padding: 0 1;
         margin-right: 1;
     }
     MatchDetail .right-col {
-        width: 45%;
+        width: 35%;
         height: 100%;
         padding: 0 1;
     }
@@ -364,14 +364,16 @@ class MatchDetail(Widget):
         margin: 0 0 1 0;
         text-align: left;
     }
-    MatchDetail .pitch-container {
+    MatchDetail .header-subtitle {
         text-align: center;
-        padding: 1 0;
-        color: #4CAF50;
-    }
-    MatchDetail .momentum-bar {
-        text-align: center;
+        color: $text-muted;
         margin-top: 1;
+    }
+    MatchDetail .league-header {
+        padding: 0 1 1 1;
+        margin-bottom: 1;
+        border-bottom: solid $surface-lighten-2;
+        color: $text;
     }
     """
 
@@ -392,6 +394,7 @@ class MatchDetail(Widget):
     def compose(self) -> ComposeResult:
         with Horizontal(classes="main-container"):
             with VerticalScroll(classes="left-sidebar"):
+                yield from self._build_league_panel()
                 yield from self._build_match_overview()
                 yield from self._build_lineups()
                 yield from self._build_subs()
@@ -401,12 +404,12 @@ class MatchDetail(Widget):
                 with Horizontal(classes="main-columns"):
                     with VerticalScroll(classes="center-col"):
                         yield from self._build_live_feed()
-                        yield from self._build_pitch()
                         yield from self._build_stats()
 
                     with VerticalScroll(classes="right-col"):
                         yield from self._build_cards()
                         yield from self._build_key_events()
+                        yield from self._build_commentary()
 
     def _build_header(self) -> list[Widget]:
         competition = self.event["competitions"][0]
@@ -435,6 +438,35 @@ class MatchDetail(Widget):
             format_live_status(self.event, show_clock=True) or f"[dim]{status.get('detail', 'Upcoming')}[/dim]"
         )
 
+        # Subtitle: date · time · venue · weather
+        date_str = self.event.get("date", "")
+        venue = competition.get("venue", {})
+        stadium = venue.get("fullName", "")
+        city = venue.get("address", {}).get("city", "")
+        venue_part = f"{stadium}, {city}" if stadium and city else stadium or city
+
+        summary_comp = (self.summary or {}).get("header", {}).get("competitions", [{}])[0]
+        weather_data = (self.summary or {}).get("gameInfo", {}).get("weather") or summary_comp.get("weather") or {}
+        weather_part = ""
+        if isinstance(weather_data, dict):
+            wx = weather_data.get("displayValue") or weather_data.get("description") or ""
+            temp = weather_data.get("temperature")
+            emoji = _get_weather_emoji(wx) if wx else "🌤️"
+            if temp is not None:
+                weather_part = f"{emoji} {temp}°C"
+            elif wx:
+                weather_part = f"{emoji} {wx}"
+
+        subtitle_parts = []
+        if date_str:
+            subtitle_parts.append(_format_local_time(date_str))
+            subtitle_parts.append(_format_local_hour(date_str))
+        if venue_part:
+            subtitle_parts.append(venue_part)
+        if weather_part:
+            subtitle_parts.append(weather_part)
+        subtitle = "  ·  ".join(subtitle_parts)
+
         return [
             Vertical(
                 Static(
@@ -442,15 +474,47 @@ class MatchDetail(Widget):
                     classes="header-score",
                 ),
                 Static(status_text, classes="header-status"),
+                Static(f"[dim]{subtitle}[/dim]", classes="header-subtitle") if subtitle else Static(""),
                 classes="header-panel",
             )
         ]
 
+    def _build_league_panel(self) -> list[Widget]:
+        """Compact league + round header above match overview."""
+        competition = self.event["competitions"][0]
+        # Competition/league name: prefer season.displayName, trim year prefix if present
+        season_raw = self.event.get("season", {}).get("displayName", "")
+        if season_raw:
+            # ESPN format: "2025-26 La Liga" → strip leading year token
+            parts = season_raw.split(" ", 1)
+            comp_name = parts[1] if len(parts) > 1 and "-" in parts[0] else season_raw
+        else:
+            notes = competition.get("notes", [])
+            comp_name = notes[0].get("headline", "") if notes else ""
+
+        # Round / Matchday
+        season = self.event.get("season", {})
+        week = season.get("slug", "")  # e.g. "regular-season-34"
+        week_num = ""
+        if week:
+            parts = week.rsplit("-", 1)
+            if len(parts) == 2 and parts[1].isdigit():
+                week_num = parts[1]
+        if not week_num:
+            week_num = str(season.get("week", "") or "")
+        round_label = f"Round {week_num}" if week_num else ""
+
+        lines = []
+        if comp_name:
+            lines.append(f"[bold]{comp_name}[/bold]")
+        if round_label:
+            lines.append(f"[dim]{round_label}[/dim]")
+        if not lines:
+            return []
+        return [Static("\n".join(lines), classes="league-header")]
+
     def _build_match_overview(self) -> list[Widget]:
         competition = self.event["competitions"][0]
-        notes = competition.get("notes", [])
-        headline = notes[0].get("headline", "Competition") if notes else "Competition"
-        comp_name = self.event.get("season", {}).get("displayName", "") or headline
 
         status = self.event["status"]["type"]
         is_live = status.get("state") == "in"
@@ -469,10 +533,10 @@ class MatchDetail(Widget):
         if isinstance(weather, dict):
             wx = weather.get("displayValue") or weather.get("description") or ""
             temp = weather.get("temperature")
-            emoji = _get_weather_emoji(wx)
-            if wx and temp is not None:
-                weather_val = f"{emoji} {wx} {temp}°"
-            elif wx:
+            emoji = _get_weather_emoji(wx) if wx else ""
+            if emoji and temp is not None:
+                weather_val = f"{emoji} {temp}°C"
+            elif emoji and wx:
                 weather_val = f"{emoji} {wx}"
 
         officials = summary_comp.get("officials") or competition.get("officials") or []
@@ -490,8 +554,6 @@ class MatchDetail(Widget):
         items = [Static("MATCH OVERVIEW", classes="panel-header")]
         if status_val:
             items.append(_kv("Status", status_val))
-        if comp_name:
-            items.append(_kv("Competition", comp_name))
         if date_val:
             items.append(_kv("Date", date_val))
         if stadium:
@@ -527,11 +589,12 @@ class MatchDetail(Widget):
         return [Vertical(*items, classes="panel")]
 
     def _build_live_feed(self) -> list[Widget]:
+        """Show the most recent 8 commentary entries as a live feed."""
         state = self.event["status"]["type"].get("state")
         if state != "in":
             return []
-        commentary = self.summary.get("commentary", [])
-        recent = [c for c in reversed(commentary) if c.get("text")][:8]
+        commentary = (self.summary or {}).get("commentary", []) or []
+        recent = [c for c in commentary if c.get("text")][:8]
         if not recent:
             return []
         lines = []
@@ -543,78 +606,29 @@ class MatchDetail(Widget):
         return [
             Vertical(
                 Static("LIVE FEED", classes="panel-header"),
-                Static("\n".join(lines), id="commentary", classes="commentary"),
+                Static("\n".join(lines), classes="commentary"),
                 classes="panel",
             )
         ]
 
-    def _build_pitch(self) -> list[Widget]:
-        rosters = self.summary.get("rosters") or []
-        competitors = self.event.get("competitions", [{}])[0].get("competitors", [])
-        home = _get_team(competitors, "home")
-        away = _get_team(competitors, "away")
-
-        def _team_color(team: dict) -> str:
-            color = team.get("color", "")
-            if color and len(color) == 6:
-                return f"#{color}"
-            return "white"
-
-        home_color = _team_color(home["team"])
-        away_color = _team_color(away["team"])
-
-        home_roster = next((r for r in rosters if str(r.get("team", {}).get("id")) == str(home["team"]["id"])), {})
-        away_roster = next((r for r in rosters if str(r.get("team", {}).get("id")) == str(away["team"]["id"])), {})
-
-        home_formation = _format_formation(home_roster.get("formation"))
-        away_formation = _format_formation(away_roster.get("formation"))
-
-        pitch_lines = [
-            "┌──────────────────────────────────────┐",
-            "│             .──────────.             │",
-            f"│             │   [{away_color}]{away_formation:^4}[/]   │             │",
-            "│    ┌────────┴──────────┴────────┐    │",
-            "│    │                            │    │",
-            "│    │                            │    │",
-            "│    └────────────────────────────┘    │",
-            "│                                      │",
-            "├───────────────────⚬──────────────────┤",
-            "│                                      │",
-            "│    ┌────────────────────────────┐    │",
-            "│    │                            │    │",
-            "│    │                            │    │",
-            "│    └────────┬──────────┬────────┘    │",
-            f"│             │   [{home_color}]{home_formation:^4}[/]   │             │",
-            "│             '──────────'             │",
-            "└──────────────────────────────────────┘",
-        ]
-
-        # Calculate momentum from possession
-        teams_data = self.summary.get("boxscore", {}).get("teams", [])
-        possession_pct = 0.5
-        if len(teams_data) >= 2:
-            home_id = str(home["team"]["id"])
-            home_td = next((t for t in teams_data if str(t["team"]["id"]) == home_id), teams_data[0])
-            for s in home_td.get("statistics", []):
-                if s["name"] == "possessionPct":
-                    try:
-                        possession_pct = float(s["displayValue"].replace("%", "").strip()) / 100.0
-                    except Exception:
-                        pass
-
-        width = 38
-        home_len = round(possession_pct * width)
-        away_len = width - home_len
-        bar = f"[{home_color}]{'█' * home_len}[/][{away_color}]{'█' * away_len}[/]"
-
-        attack_label = f"[{home_color}]{home['team']['abbreviation']}[/] {round(possession_pct * 100)}% Momentum {round((1 - possession_pct) * 100)}% [{away_color}]{away['team']['abbreviation']}[/]"
-
+    def _build_commentary(self) -> list[Widget]:
+        """Full scrollable commentary in the right column."""
+        state = self.event["status"]["type"].get("state")
+        if state not in ("in", "post"):
+            return []
+        commentary = (self.summary or {}).get("commentary", []) or []
+        if not commentary:
+            return []
+        lines = []
+        for c in commentary:
+            minute = c.get("time", {}).get("displayValue", "")
+            text = c.get("text", "")
+            prefix = f"[dim]{minute:>3}'[/dim]  " if minute else "      "
+            lines.append(f"{prefix}{text}")
         return [
             Vertical(
-                Static("PITCH", classes="panel-header"),
-                Static("\n".join(pitch_lines), classes="pitch-container"),
-                Static(bar, classes="momentum-bar"),
-                Static(attack_label, classes="momentum-bar"),
+                Static("COMMENTARY", classes="panel-header"),
+                Static("\n\n".join(lines), id="commentary", classes="commentary"),
                 classes="panel",
             )
         ]
