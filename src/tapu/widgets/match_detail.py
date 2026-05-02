@@ -341,7 +341,7 @@ class TimelineModal(ModalScreen):
         with Container():
             yield Static("MATCH TIMELINE", classes="panel-header")
             with VerticalScroll(id="timeline-list"):
-                for c in reversed(commentary):
+                for c in commentary:
                     min_val = c.get("time", {}).get("displayValue", "")
                     text = c.get("text", "")
                     icon = _get_event_icon(text)
