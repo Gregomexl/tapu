@@ -32,13 +32,13 @@ def _event_local_date(event: dict) -> date:
         return date.today()
 
 
-def _group_events_by_day(events: list) -> list[tuple[date, list]]:
-    """Return [(day, [events sorted live-first]) ...] sorted newest day first."""
+def _group_events_by_day(events: list, reverse: bool = True) -> list[tuple[date, list]]:
+    """Return [(day, [events sorted live-first]) ...]."""
     by_day: dict[date, list] = defaultdict(list)
     for ev in events:
         by_day[_event_local_date(ev)].append(ev)
     result = []
-    for d in sorted(by_day.keys(), reverse=True):
+    for d in sorted(by_day.keys(), reverse=reverse):
         day_evs = by_day[d]
         live = [e for e in day_evs if e["status"]["type"].get("state") == "in"]
         done = [e for e in day_evs if e["status"]["type"].get("state") == "post"]
@@ -264,7 +264,8 @@ class LeagueScreen(Screen):
                 await pane.mount(Static("[dim]No matches[/dim]", classes="no-matches"))
             return
         widgets: list = []
-        for day, day_evs in _group_events_by_day(events):
+        is_upcoming = self._status_filter == "upcoming"
+        for day, day_evs in _group_events_by_day(events, reverse=not is_upcoming):
             widgets.append(Static(_day_label(day, today), classes="section-header"))
             for ev in day_evs:
                 widgets.append(MatchCard(ev, client=self.client, positions=self._positions, flash=ev["id"] in flash_ids))
@@ -295,6 +296,7 @@ class LeagueScreen(Screen):
     async def _load_main(self) -> None:
         today = date.today()
         start = today - timedelta(days=self._days_back)
+        end = today + timedelta(days=self._days_back)
 
         if self.league.is_tournament:
             try:
@@ -311,7 +313,7 @@ class LeagueScreen(Screen):
             self.client.get_scoreboard_daterange(
                 self.league.slug,
                 _date_to_api(start),
-                _date_to_api(today),
+                _date_to_api(end),
             ),
             return_exceptions=True,
         )
